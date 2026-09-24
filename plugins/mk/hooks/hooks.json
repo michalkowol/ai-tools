@@ -1,0 +1,17 @@
+{
+  "description": "Denies or asks for confirmation before risky commands",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/guard.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

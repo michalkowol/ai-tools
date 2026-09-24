@@ -1,0 +1,11 @@
+{
+  "name": "mk",
+  "version": "1.0.0",
+  "description": "Personal slash commands, skills and a guard hook for risky commands",
+  "author": {
+    "name": "Michał Kowol",
+    "email": "michal.kowol@gmail.com"
+  },
+  "repository": "https://github.com/michalkowol/ai-tools",
+  "license": "MIT"
+}

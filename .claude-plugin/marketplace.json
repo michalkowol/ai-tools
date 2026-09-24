@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "michalkowol",
+  "description": "Michał Kowol's commands, skills and hooks for Claude Code",
+  "owner": {
+    "name": "Michał Kowol",
+    "email": "michal.kowol@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "mk",
+      "description": "Personal slash commands, skills and a guard hook for risky commands",
+      "source": "./plugins/mk",
+      "category": "productivity"
+    }
+  ]
+}
