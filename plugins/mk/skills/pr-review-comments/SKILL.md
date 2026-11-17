@@ -34,7 +34,7 @@ Add inline comments to a GitHub PR as a **pending** review. The user publishes i
    ```
 
    For a range use `start_line` + `line` (both with `side: "RIGHT"`).
-5. `gh api` is blocked by the mk guard hook, so do not run it and do not route around it with curl. Ask the user to run:
+5. `gh api` writes are blocked by the mk guard hook (reads are allowed), so do not run it and do not route around it with curl. Ask the user to run:
 
    ```
    ! gh api -X POST repos/<OWNER>/<REPO>/pulls/<N>/reviews --input <payload path>
