@@ -2,13 +2,12 @@
 # PreToolUse hook for Bash: denies or asks before risky commands.
 # Plugins cannot ship permission rules, so this mirrors the deny/ask lists
 # of ai/config/claude/managed-settings.json, except that read-only `gh api`
-# calls (GET, GraphQL queries) are allowed and only writes are denied.
+# calls (GET, GraphQL queries) are allowed and only writes need confirmation.
 #
 # Requires only bash, grep and sed (no jq), so it runs on a bare macOS too.
 # Every segment of a compound command (&&, ||, ;, |, newline) is checked.
 
 DENY=(
-  "git push"
   "gh repo delete"
   "gh repo archive"
   "gh repo unarchive"
@@ -20,7 +19,6 @@ DENY=(
   "gh issue delete"
   "gh issue transfer"
   "gh label delete"
-  "gh pr merge"
   "gh secret"
   "gh variable"
   "gh ssh-key"
@@ -36,6 +34,8 @@ DENY=(
 )
 
 ASK=(
+  "git push"
+  "gh pr merge"
   "gh pr comment"
   "gh pr review"
   "gh pr create"
@@ -120,8 +120,8 @@ while IFS= read -r segment; do
   if matches "$segment" "${DENY[@]}"; then
     decide deny "'$MATCHED' is blocked by the mk plugin guard hook. Ask the user to run it themselves."
   fi
-  if matches "$segment" "gh api" && gh_api_is_write "$segment"; then
-    decide deny "'gh api' writes (non-GET or GraphQL mutation) are blocked by the mk plugin guard hook. Ask the user to run it themselves."
+  if [ -z "$ASKED" ] && matches "$segment" "gh api" && gh_api_is_write "$segment"; then
+    ASKED="gh api (write)"
   fi
   if [ -z "$ASKED" ] && matches "$segment" "${ASK[@]}"; then
     ASKED=$MATCHED
