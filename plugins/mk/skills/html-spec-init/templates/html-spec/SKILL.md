@@ -21,18 +21,39 @@ This skill was installed into the project by `/mk:html-spec-init` from [michalko
 ```
 /plugin marketplace add michalkowol/ai-tools
 /plugin install mk@michalkowol
-``` Do not edit this skill in the project, change it in ai-tools and re-run the init.
+```
+
+Do not edit this skill in the project, change it in ai-tools and re-run the init.
 
 ## Workflow
 
-### 1. Create the spec
+### 0. Gather facts and pick the path
 
-1. Gather facts yourself before asking anything: read the code, configs, docs, run read-only commands, use a sub-agent for wide searches. Never ask the user for something you can look up.
+Gather facts yourself before asking anything: read the code, configs, docs, run read-only commands, use a sub-agent for wide searches. Never ask the user for something you can look up.
+
+Then build the decision tree and count the decisions:
+
+- **1-2 decisions, no dependent branches:** a draft round trip is not worth it. Use the quick path below.
+- **More than 2 decisions, or decisions that open further questions:** use the draft workflow (steps 1-3).
+
+### Quick path
+
+1. Ask the questions in the session (with the question tool if available): options, a recommended option first, the trade-off in one sentence.
+2. Create the spec from `template.html` straight away with `status="decided"`, in English: Context, Facts and Out of scope filled in, no Open questions section, Prompt at the end (final order).
+3. Record every answer as a `<spec-decision>` exactly as in step 2 below: all options with `chosen` on the picked ones, the user's note translated to English, the rationale.
+4. Add the row to `.agents/docs/INDEX.md` with status `decided`.
+5. Give the user the implementation prompt (the same text the `<spec-prompt>` generates).
+
+If an answer opens new questions and the total goes above 2, switch to the draft workflow: create the spec as `draft`, record the decisions made so far and put the new questions into Open questions.
+
+### 1. Create the spec (draft)
+
+1. Facts are gathered in step 0.
 2. Copy `template.html` to `.agents/docs/specs/YYYY-MM-DD-short-name.html` and replace the example content. Keep the `<link>` and `<script>` tags unchanged.
 3. Fill in `<spec-header status="draft">`, Context, Facts (each with its source) and Out of scope.
-4. Build the decision tree and write round 1 into Open questions (rules below).
+4. Write round 1 into Open questions (rules below).
 5. Add a row to `.agents/docs/INDEX.md` with status `draft`.
-6. Tell the user the file path and ask them to open it, answer, and paste the prompt from the bottom of the page.
+6. Tell the user the file path and ask them to open it, answer, and paste the prompt from the Prompt section under the questions.
 
 ### 2. Process a round
 
