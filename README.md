@@ -26,6 +26,17 @@ Restart Claude Code (or run `/reload-plugins`) afterwards. Bump `version` in `pl
 
 Plugin commands are namespaced, e.g. `/mk:commit`.
 
+### HTML specs
+
+`/mk:html-spec-init` sets up a project for planning in HTML files. It copies the `html-spec` and `html-spec-extract` skills into the project's `.claude/skills/`, so every engineer can use them without this plugin, and creates `.agents/docs/specs/` with `.agents/docs/INDEX.md`.
+
+Specs load the global style and components from GitHub Pages:
+
+- https://michalkowol.github.io/ai-tools/plugins/mk/skills/html-spec-init/assets/style.css
+- https://michalkowol.github.io/ai-tools/plugins/mk/skills/html-spec-init/assets/components.js
+
+The URLs are not versioned, so changes to these files must stay backwards compatible. They go live after merging to `main`.
+
 ## License
 
 MIT
