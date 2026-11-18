@@ -68,6 +68,13 @@ blockquote {
   line-height: 1.5;
 }
 
+cite {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--gray-500);
+}
+cite::before { content: 'Source: '; }
+
 hr {
   border: 0;
   border-top: 1.5px solid var(--gray-300);
@@ -282,7 +289,15 @@ spec-decision[superseded-by] spec-option,
 spec-decision[superseded-by] .note,
 spec-decision[superseded-by] .why { text-decoration: line-through; color: var(--gray-500); }
 spec-decision[superseded-by] spec-option .label { color: var(--gray-500); }
+spec-decision[outcome] .q { color: var(--gray-700); }
+spec-decision[outcome] spec-option .mark { color: var(--gray-500); }
+spec-decision .pill.outcome { background: var(--oat); border-color: var(--oat); color: var(--slate); }
 spec-decision:target { background: var(--gray-150); }
+
+/* ---------- topic ---------- */
+
+.pill.topic { background: var(--white); }
+.pill.ticket { text-decoration: none; }
 
 /* ---------- <spec-prompt> ---------- */
 

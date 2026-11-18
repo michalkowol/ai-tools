@@ -77,9 +77,17 @@ The user pastes a prompt that starts with `/html-spec Round N answers for <file>
    </spec-decision>
    ```
 2. Remove the answered `<spec-question>` elements. Open questions only hold the current round, the history lives in the Decision log.
-3. If an answer changes an earlier decision, add a new decision and set `superseded-by="Dn"` on the old one. Never delete decisions.
-4. Move new facts to Facts. Move things the user excluded to Out of scope.
-5. If the answers open new questions, write the next round. Otherwise finalize.
+3. If an answer changes an earlier decision, add a new decision and link them. Never delete decisions.
+   - The whole decision changes: set `superseded-by="Dn"` on the old one.
+   - Only a part changes (e.g. one detail of a note): set `amended-by="Dn"` on the old one and `amends="Dm"` on the new one. The old decision stays active.
+4. A question that ends without a decision still becomes a `<spec-decision>` with the next `Dn` number, its options without `chosen`, and `outcome`:
+   - `deferred`: we come back to it later;
+   - `dropped`: the question no longer makes sense;
+   - `out-of-scope`: not part of this spec (also add it to Out of scope).
+
+   Every `Qn` leaves a trace in the Decision log, nothing disappears.
+5. Move new facts to Facts. Move things the user excluded to Out of scope.
+6. If the answers open new questions, write the next round. Otherwise finalize.
 
 ### 3. Finalize
 
@@ -87,8 +95,9 @@ When no open questions are left:
 
 1. If the session was in a language other than English, translate the whole file to English in place, including the users' notes in the Decision log and the alternatives that were not chosen. Keep the meaning, do not add sentences. The audience is engineers and agents.
 2. Remove the empty Open questions section and move the Prompt section to the end, so the page starts with Context.
-3. Set `status="decided"` in `<spec-header>` and in `INDEX.md`.
-4. The `<spec-prompt>` switches to the implementation prompt by itself. Tell the user to copy it into a new session or this one.
+3. Find the decisions that need work outside this implementation (another team, a separate task, something that takes long). Ask the user for a ticket key or a link for each of them and set `ticket` on the decision. If the user asks, create the tickets (e.g. through Jira MCP). The spec is not a task tracker: it holds no tasks, owners or progress, only the reference to where the work is tracked.
+4. Set `status="decided"` in `<spec-header>` and in `INDEX.md`.
+5. The `<spec-prompt>` switches to the implementation prompt by itself. Tell the user to copy it into a new session or this one.
 
 ### 4. After implementation
 
@@ -105,6 +114,7 @@ Follow the grilling method:
 - An "Other" option and a note field are added automatically. Use `no-other` only when other answers make no sense.
 - Use `multiple` for non-exclusive choices.
 - Ask about decisions only. Facts go to the Facts section with a source.
+- When a spec covers several areas, give questions a `topic` (short label, e.g. `topic="Monorepo"`). The decision keeps the question's topic. It is shown as a pill.
 - Number questions `Q1, Q2, ...` continuously across rounds, never reuse a number.
 
 ## INDEX.md
@@ -135,13 +145,18 @@ The URLs are not versioned. Changes to `style.css` and `components.js` must stay
 
 While the spec is a `draft`, Open questions and Prompt come right after `<spec-header>`, so the user answers and copies the prompt without scrolling, and reads the rest only when needed. When the spec is finalized, Open questions is removed, Prompt moves to the end and the page keeps the reference order: Context, Facts, Out of scope, Decision log, Prompt.
 
+Conventions inside the sections:
+
+- Every fact ends with its source in `<cite>`: `<li>12 switches in 7 files. <cite>lines 6-34</cite></li>`. The style adds the "Source:" prefix, do not write it. Facts may be grouped with `<h3>`.
+- References to decisions and questions are explicit links: `<a href="#D6">D6</a>`. Decisions get their `id` automatically. Plain "D6" in text is not linked.
+
 ```html
 <main>
   <spec-header date="YYYY-MM-DD" status="draft"> <h1>…</h1> <p>…</p> </spec-header>
   <section id="questions"> <h2>Open questions</h2> <spec-question>… </section>  <!-- draft only -->
   <section id="prompt"> <h2>Prompt</h2> <spec-prompt file="…"></spec-prompt> </section>   <!-- draft position -->
   <section id="context"> <h2>Context</h2> … </section>
-  <section id="facts"> <h2>Facts</h2> <ul><li>… Source: …</li></ul> </section>
+  <section id="facts"> <h2>Facts</h2> <ul><li>… <cite>source</cite></li></ul> </section>
   <section id="out-of-scope"> <h2>Out of scope</h2> <ul>…</ul> </section>
   <section id="decisions"> <h2>Decision log</h2> <spec-decision>… </section>
   <!-- after finalizing, Prompt moves here -->
@@ -168,7 +183,7 @@ Tokens (CSS variables):
 | `--olive` | `#788C5D` | positive: active decisions, implemented |
 | `--serif` / `--sans` / `--mono` | system stacks | headings and quotes / body / code and labels |
 
-Styled elements: `h1`-`h3` (serif), `p`, `ul`, `ol`, `code`, `pre` (dark code block), `blockquote` (clay rule), `table` / `th` / `td`, `hr`, `a`, and `main` (760px column) with `main > section` spacing.
+Styled elements: `h1`-`h3` (serif), `p`, `ul`, `ol`, `code`, `pre` (dark code block), `blockquote` (clay rule), `table` / `th` / `td`, `hr`, `a`, `cite` (muted, "Source:" prefix), and `main` (760px column) with `main > section` spacing.
 
 Classes:
 
@@ -188,20 +203,20 @@ Light DOM custom elements, so `style.css` styles them directly. Answers are save
 `<spec-header date="YYYY-MM-DD" status="draft|decided|implemented">`
 : Children: `<h1>` title and an optional `<p>` summary. Renders the date and a status tag.
 
-`<spec-question qid="Q1" round="1" [multiple] [show-if="Q1=A|B"] [no-other]>`
+`<spec-question qid="Q1" round="1" [multiple] [show-if="Q1=A|B"] [no-other] [topic="…"]>`
 : Children: `<h3>` question, optional `<p>` context, then `<spec-option>` elements. Renders radios (checkboxes with `multiple`), an "Other" option and a note field. With `show-if` it is hidden until the referenced question has one of the listed values. Hidden questions are left out of the prompt.
 
 `<spec-option value="A" label="Short label" [recommended]>Description</spec-option>`
 : One option. `recommended` is preselected and tagged.
 
-`<spec-decision did="D1" round="1" [from="Q1"] [superseded-by="D3"]>`
-: Children: `<p class="q">` question, every `<spec-option>` of the question with `chosen` on the picked ones, optional `<p class="note">` user's note, `<p class="why">` rationale. Renders the chosen options with a check mark and the alternatives muted below them. Gets `id="D1"` for links. With `superseded-by` it is struck through and links to the newer decision. The older form with `<p class="choice">` instead of options still renders.
+`<spec-decision did="D1" round="1" [from="Q1"] [topic="…"] [ticket="DARCH-123|https://…"] [superseded-by="D3"] [amended-by="D4"] [amends="D2"] [outcome="deferred|dropped|out-of-scope"]>`
+: Children: `<p class="q">` question, every `<spec-option>` of the question with `chosen` on the picked ones, optional `<p class="note">` user's note, `<p class="why">` rationale. Renders the chosen options with a check mark and the alternatives muted below them. Gets `id="D1"` for links. With `superseded-by` it is struck through and links to the newer decision. `amended-by` / `amends` show linked pills and keep the decision active. With `outcome` it shows the outcome pill and is not an active decision. `ticket` holds one Jira key (shown as a tag) or one URL, e.g. another team's ticket or a Slack thread (shown as a link); set it only for decisions whose work is tracked outside this implementation. The older form with `<p class="choice">` instead of options still renders.
 
 `<spec-prompt file=".agents/docs/specs/….html">`
 : Textarea with Copy and Reset answers buttons. The text is generated from the page:
   - open questions present: `/html-spec Round N answers for <file>` and one `Qn: values — labels` line per visible question, with notes;
   - no questions, status `draft`: `/html-spec Finalize <file>`;
-  - status `decided` or `implemented`: implementation prompt with all active decisions.
+  - status `decided` or `implemented`: implementation prompt with active decisions (with notes, amendments and tickets) and a "Not decided" block (decisions with `outcome`).
 
 ## local-components.js
 

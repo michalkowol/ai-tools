@@ -4,9 +4,9 @@
  *
  * Light DOM custom elements (no shadow DOM), styled by style.css:
  *   <spec-header date status>                     title, date, status
- *   <spec-question qid round [multiple] [show-if] [no-other]>
+ *   <spec-question qid round [multiple] [show-if] [no-other] [topic]>
  *     <spec-option value label [recommended]>     one answer option
- *   <spec-decision did round [from] [superseded-by]>
+ *   <spec-decision did round [from] [topic] [ticket] [superseded-by] [amended-by] [amends] [outcome]>
  *     <spec-option value label [recommended] [chosen]>  all options, chosen marked
  *   <spec-prompt file>                            prompt to paste back into the session
  *
@@ -36,6 +36,13 @@
   const saveState = (state) => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* storage unavailable */ }
   };
+
+  const OUTCOMES = ['deferred', 'dropped', 'out-of-scope'];
+  const link = (id) => h('a', { href: `#${id}` }, id);
+  const ticketRef = (value) => (/^https?:\/\//.test(value)
+    ? h('a', { class: 'pill ticket', href: value, target: '_blank', rel: 'noopener' }, new URL(value).hostname.replace(/^www\./, ''))
+    : h('span', { class: 'tag ticket' }, value));
+  const topicPill = (el) => (el.getAttribute('topic') ? h('span', { class: 'pill topic' }, el.getAttribute('topic')) : null);
 
   const parseCondition = (expr) => {
     const m = /^\s*([\w-]+)\s*=\s*([\w|-]+)\s*$/.exec(expr || '');
@@ -76,6 +83,7 @@
       );
       const cond = parseCondition(this.getAttribute('show-if'));
       if (cond) head.append(h('span', { class: 'pill condition' }, `if ${cond.qid} = ${cond.values.join(' or ')}`));
+      head.append(topicPill(this) || '');
       this.prepend(head);
 
       for (const opt of this.options) {
@@ -144,11 +152,19 @@
       if (did && !this.id) this.id = did;
       const from = this.getAttribute('from');
       const by = this.getAttribute('superseded-by');
+      const amendedBy = this.getAttribute('amended-by');
+      const amends = this.getAttribute('amends');
+      const outcome = this.outcome;
       const meta = [`Round ${this.getAttribute('round') || 1}`, from ? `from ${from}` : null].filter(Boolean).join(' · ');
       this.prepend(h('div', { class: 'head' },
-        h('span', { class: by ? 'tag' : 'tag positive' }, did || 'D?'),
+        h('span', { class: this.active ? 'tag positive' : 'tag' }, did || 'D?'),
         h('span', { class: 'eyebrow' }, meta),
-        by ? h('span', { class: 'pill' }, 'superseded by ', h('a', { href: `#${by}` }, by)) : null,
+        outcome ? h('span', { class: 'pill outcome' }, outcome) : null,
+        by ? h('span', { class: 'pill' }, 'superseded by ', link(by)) : null,
+        amendedBy ? h('span', { class: 'pill' }, 'amended by ', ...amendedBy.split(/[\s,]+/).flatMap((id, i) => (i ? [', ', link(id)] : [link(id)]))) : null,
+        amends ? h('span', { class: 'pill' }, 'amends ', link(amends)) : null,
+        topicPill(this),
+        this.getAttribute('ticket') ? ticketRef(this.getAttribute('ticket').trim()) : null,
       ));
 
       // Options keep the alternatives that were not chosen, for the history.
@@ -176,13 +192,24 @@
     }
 
     get options() { return [...this.querySelectorAll(':scope > spec-option, :scope > .options > spec-option')]; }
-    get active() { return !this.hasAttribute('superseded-by'); }
+    get outcome() {
+      const o = this.getAttribute('outcome');
+      return OUTCOMES.includes(o) ? o : null;
+    }
+    get active() { return !this.hasAttribute('superseded-by') && !this.outcome; }
     get summary() {
       const q = this.querySelector('.q')?.textContent.trim() || '';
       const chosen = this.options.filter((o) => o.hasAttribute('chosen')).map((o) => o.getAttribute('label') || o.getAttribute('value'));
       const c = this.querySelector('.choice')?.textContent.trim() || chosen.join('; ');
       const note = this.querySelector('.note')?.textContent.trim();
-      return `${this.getAttribute('did')}: ${q} → ${c}${note ? ` (note: ${note})` : ''}`;
+      if (this.outcome) {
+        const why = this.querySelector('.why')?.textContent.trim();
+        const ticket = this.getAttribute('ticket');
+        return `${this.getAttribute('did')}: ${q} → ${this.outcome}${why ? ` (${why})` : ''}${ticket ? ` [ticket ${ticket}]` : ''}`;
+      }
+      const amended = this.getAttribute('amended-by');
+      const ticket = this.getAttribute('ticket');
+      return `${this.getAttribute('did')}: ${q} → ${c}${note ? ` (note: ${note})` : ''}${amended ? ` [amended by ${amended}]` : ''}${ticket ? ` [ticket ${ticket}]` : ''}`;
     }
   }
 
@@ -243,7 +270,9 @@
         return;
       }
 
-      const decisions = [...document.querySelectorAll('spec-decision')].filter((d) => d.active);
+      const all = [...document.querySelectorAll('spec-decision')];
+      const decisions = all.filter((d) => d.active);
+      const undecided = all.filter((d) => d.outcome && !d.hasAttribute('superseded-by'));
       this._mode.textContent = 'Implementation prompt';
       this._text.value = [
         `Implement the spec ${file}.`,
@@ -251,6 +280,7 @@
         '',
         'Decisions:',
         ...decisions.map((d) => `- ${d.summary}`),
+        ...(undecided.length ? ['', 'Not decided (do not implement):', ...undecided.map((d) => `- ${d.summary}`)] : []),
         '',
         'When done, set the spec status to implemented in the file and in .agents/docs/INDEX.md.',
       ].join('\n');
