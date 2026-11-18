@@ -38,7 +38,23 @@ This skill was installed into the project by `/mk:html-spec-init` from [michalko
 
 The user pastes a prompt that starts with `/html-spec Round N answers for <file>`.
 
-1. For every answered question add a `<spec-decision>` to the Decision log: question, chosen answer, rationale (from the option description and the user's note), round and `from="Qn"`. Number decisions `D1, D2, ...` continuously across rounds.
+1. For every answered question add a `<spec-decision>` to the Decision log with round and `from="Qn"`. Number decisions `D1, D2, ...` continuously across rounds. The decision is the history, so keep everything the user saw and wrote:
+   - the question as `<p class="q">`;
+   - **all** `<spec-option>` elements of the question, unchanged (value, label, description, `recommended`), with `chosen` added to the picked ones. Add the `other` option only if it was picked;
+   - the user's note as `<p class="note">`, word for word, in the language it was written in until the spec is finalized;
+   - the rationale as `<p class="why">`, based on the option description and the note.
+
+   A note never replaces the chosen option, it refines it: `A` with a note means "A, adjusted by the note". Apply both. If the note contradicts the chosen option or leaves it ambiguous, do not guess, ask a follow-up question in the next round.
+
+   ```html
+   <spec-decision did="D2" round="2" from="Q2">
+     <p class="q">Keep offset pagination as a fallback?</p>
+     <spec-option value="A" label="Yes, behind a query parameter" recommended>Safer rollout.</spec-option>
+     <spec-option value="B" label="No, remove it in the same change" chosen>Less code, but no way back.</spec-option>
+     <p class="note">Both clients deploy on the same day.</p>
+     <p class="why">A fallback only adds code to delete later.</p>
+   </spec-decision>
+   ```
 2. Remove the answered `<spec-question>` elements. Open questions only hold the current round, the history lives in the Decision log.
 3. If an answer changes an earlier decision, add a new decision and set `superseded-by="Dn"` on the old one. Never delete decisions.
 4. Move new facts to Facts. Move things the user excluded to Out of scope.
@@ -48,9 +64,10 @@ The user pastes a prompt that starts with `/html-spec Round N answers for <file>
 
 When no open questions are left:
 
-1. If the session was in a language other than English, translate the whole file to English in place. Keep the meaning, do not add sentences. The audience is engineers and agents.
-2. Set `status="decided"` in `<spec-header>` and in `INDEX.md`.
-3. The `<spec-prompt>` switches to the implementation prompt by itself. Tell the user to copy it into a new session or this one.
+1. If the session was in a language other than English, translate the whole file to English in place, including the users' notes in the Decision log and the alternatives that were not chosen. Keep the meaning, do not add sentences. The audience is engineers and agents.
+2. Remove the empty Open questions section and move the Prompt section to the end, so the page starts with Context.
+3. Set `status="decided"` in `<spec-header>` and in `INDEX.md`.
+4. The `<spec-prompt>` switches to the implementation prompt by itself. Tell the user to copy it into a new session or this one.
 
 ### 4. After implementation
 
@@ -95,15 +112,18 @@ The URLs are not versioned. Changes to `style.css` and `components.js` must stay
 
 ### Page skeleton
 
+While the spec is a `draft`, Open questions and Prompt come right after `<spec-header>`, so the user answers and copies the prompt without scrolling, and reads the rest only when needed. When the spec is finalized, Open questions is removed, Prompt moves to the end and the page keeps the reference order: Context, Facts, Out of scope, Decision log, Prompt.
+
 ```html
 <main>
   <spec-header date="YYYY-MM-DD" status="draft"> <h1>…</h1> <p>…</p> </spec-header>
+  <section id="questions"> <h2>Open questions</h2> <spec-question>… </section>  <!-- draft only -->
+  <section id="prompt"> <h2>Prompt</h2> <spec-prompt file="…"></spec-prompt> </section>   <!-- draft position -->
   <section id="context"> <h2>Context</h2> … </section>
   <section id="facts"> <h2>Facts</h2> <ul><li>… Source: …</li></ul> </section>
   <section id="out-of-scope"> <h2>Out of scope</h2> <ul>…</ul> </section>
-  <section id="questions"> <h2>Open questions</h2> <spec-question>… </section>
   <section id="decisions"> <h2>Decision log</h2> <spec-decision>… </section>
-  <section id="prompt"> <h2>Prompt</h2> <spec-prompt file="…"></spec-prompt> </section>
+  <!-- after finalizing, Prompt moves here -->
 </main>
 ```
 
@@ -154,7 +174,7 @@ Light DOM custom elements, so `style.css` styles them directly. Answers are save
 : One option. `recommended` is preselected and tagged.
 
 `<spec-decision did="D1" round="1" [from="Q1"] [superseded-by="D3"]>`
-: Children: `<p class="q">` question, `<p class="choice">` chosen answer, `<p class="why">` rationale. Gets `id="D1"` for links. With `superseded-by` it is struck through and links to the newer decision.
+: Children: `<p class="q">` question, every `<spec-option>` of the question with `chosen` on the picked ones, optional `<p class="note">` user's note, `<p class="why">` rationale. Renders the chosen options with a check mark and the alternatives muted below them. Gets `id="D1"` for links. With `superseded-by` it is struck through and links to the newer decision. The older form with `<p class="choice">` instead of options still renders.
 
 `<spec-prompt file=".agents/docs/specs/….html">`
 : Textarea with Copy and Reset answers buttons. The text is generated from the page:

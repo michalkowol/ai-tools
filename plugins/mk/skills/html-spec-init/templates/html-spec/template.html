@@ -16,26 +16,6 @@
     <p>Replace offset pagination in <code>GET /orders</code> with cursor pagination so deep pages stay fast.</p>
   </spec-header>
 
-  <section id="context">
-    <h2>Context</h2>
-    <p>Offset queries on the orders table get slow past page 200. Clients only move forward through the list.</p>
-  </section>
-
-  <section id="facts">
-    <h2>Facts</h2>
-    <ul>
-      <li><code>orders.id</code> is a monotonically increasing bigint. Source: <code>db/migrations/V1__orders.sql</code></li>
-      <li>Two internal clients call <code>GET /orders?page=</code>. Source: access logs, last 30 days</li>
-    </ul>
-  </section>
-
-  <section id="out-of-scope">
-    <h2>Out of scope</h2>
-    <ul>
-      <li>Backward pagination</li>
-    </ul>
-  </section>
-
   <section id="questions">
     <h2>Open questions</h2>
 
@@ -60,25 +40,48 @@
     </spec-question>
   </section>
 
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-18-orders-cursor-pagination.html"></spec-prompt>
+  </section>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>Offset queries on the orders table get slow past page 200. Clients only move forward through the list.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <ul>
+      <li><code>orders.id</code> is a monotonically increasing bigint. Source: <code>db/migrations/V1__orders.sql</code></li>
+      <li>Two internal clients call <code>GET /orders?page=</code>. Source: access logs, last 30 days</li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Backward pagination</li>
+    </ul>
+  </section>
+
   <section id="decisions">
     <h2>Decision log</h2>
 
     <spec-decision did="D1" round="1" from="Q1" superseded-by="D2">
       <p class="q">Keep offset pagination as a fallback?</p>
-      <p class="choice">Yes, behind a query parameter</p>
-      <p class="why">Safer rollout.</p>
+      <spec-option value="A" label="Yes, behind a query parameter" recommended chosen>Safer rollout.</spec-option>
+      <spec-option value="B" label="No, remove it in the same change">Less code, but no way back.</spec-option>
+      <p class="why">Recommended option accepted.</p>
     </spec-decision>
 
     <spec-decision did="D2" round="2" from="Q2">
       <p class="q">Keep offset pagination as a fallback?</p>
-      <p class="choice">No, remove it in the same change</p>
+      <spec-option value="A" label="Yes, behind a query parameter" recommended>Safer rollout.</spec-option>
+      <spec-option value="B" label="No, remove it in the same change" chosen>Less code, but no way back.</spec-option>
+      <p class="note">Both clients deploy on the same day, so a fallback is not needed.</p>
       <p class="why">Both clients can migrate at once, so a fallback only adds code to delete later.</p>
     </spec-decision>
-  </section>
-
-  <section id="prompt">
-    <h2>Prompt</h2>
-    <spec-prompt file=".agents/docs/specs/2026-11-18-orders-cursor-pagination.html"></spec-prompt>
   </section>
 
 </main>

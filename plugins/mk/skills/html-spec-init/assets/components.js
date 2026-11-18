@@ -7,6 +7,7 @@
  *   <spec-question qid round [multiple] [show-if] [no-other]>
  *     <spec-option value label [recommended]>     one answer option
  *   <spec-decision did round [from] [superseded-by]>
+ *     <spec-option value label [recommended] [chosen]>  all options, chosen marked
  *   <spec-prompt file>                            prompt to paste back into the session
  *
  * Load with <script defer src="..."> so all markup is parsed before upgrade.
@@ -94,9 +95,11 @@
         ));
       }
 
-      this._note = h('textarea', { class: 'field', placeholder: 'Note (optional, any language)' });
+      this._note = h('textarea', { class: 'field', placeholder: 'Note (optional, any language). It is applied together with the selected option, e.g. A + this note.' });
       this._note.value = saved?.note || '';
-      this.append(this._note);
+      this._hint = h('p', { class: 'note-hint' });
+      this.append(this._note, this._hint);
+      this._updateHint();
 
       this.addEventListener('change', () => this._persist());
       this.addEventListener('input', () => this._persist());
@@ -114,7 +117,17 @@
       };
     }
 
+    _updateHint() {
+      const { values, labels, note } = this.answer;
+      const picked = values.filter((v) => v !== 'other').map((v, i) => `${v} — ${labels[values.indexOf(v)]}`);
+      this._hint.hidden = !note;
+      this._hint.textContent = !note ? ''
+        : picked.length ? `This note applies together with ${picked.join(', ')}.`
+        : 'This note is your answer.';
+    }
+
     _persist() {
+      this._updateHint();
       const state = loadState();
       const { values, note } = this.answer;
       state[this.qid] = { values, note };
@@ -137,13 +150,39 @@
         h('span', { class: 'eyebrow' }, meta),
         by ? h('span', { class: 'pill' }, 'superseded by ', h('a', { href: `#${by}` }, by)) : null,
       ));
+
+      // Options keep the alternatives that were not chosen, for the history.
+      const options = this.options;
+      if (options.length) {
+        const list = h('div', { class: 'options' });
+        options[0].before(list);
+        for (const opt of options) {
+          const chosen = opt.hasAttribute('chosen');
+          const desc = [...opt.childNodes];
+          opt.replaceChildren(
+            h('span', { class: 'mark' }, chosen ? '✓' : ''),
+            h('span', {},
+              h('span', { class: 'label' },
+                h('span', { class: 'value' }, opt.getAttribute('value') || ''),
+                opt.getAttribute('label') || '',
+                opt.hasAttribute('recommended') ? h('span', { class: 'tag' }, 'recommended') : null,
+              ),
+              desc.length ? h('span', { class: 'desc' }, ...desc) : null,
+            ),
+          );
+          list.append(opt);
+        }
+      }
     }
 
+    get options() { return [...this.querySelectorAll(':scope > spec-option, :scope > .options > spec-option')]; }
     get active() { return !this.hasAttribute('superseded-by'); }
     get summary() {
       const q = this.querySelector('.q')?.textContent.trim() || '';
-      const c = this.querySelector('.choice')?.textContent.trim() || '';
-      return `${this.getAttribute('did')}: ${q} → ${c}`;
+      const chosen = this.options.filter((o) => o.hasAttribute('chosen')).map((o) => o.getAttribute('label') || o.getAttribute('value'));
+      const c = this.querySelector('.choice')?.textContent.trim() || chosen.join('; ');
+      const note = this.querySelector('.note')?.textContent.trim();
+      return `${this.getAttribute('did')}: ${q} → ${c}${note ? ` (note: ${note})` : ''}`;
     }
   }
 
@@ -177,9 +216,10 @@
         const round = Math.max(...questions.map((q) => Number(q.getAttribute('round')) || 1));
         const lines = questions.filter((q) => !q.hidden).map((q) => {
           const { values, labels, note } = q.answer;
-          const answer = values.length
-            ? `${values.join(', ')} — ${labels.join('; ')}`
-            : '(no answer)';
+          const named = labels.filter((_, i) => values[i] !== 'other');
+          const answer = !values.length ? '(no answer)'
+            : named.length ? `${values.join(', ')} — ${named.join('; ')}`
+            : values.join(', ');
           return `${q.qid}: ${answer}${note ? `\n    Note: ${note}` : ''}`;
         });
         this._mode.textContent = `Round ${round} answers`;
@@ -188,7 +228,7 @@
           '',
           ...lines,
           '',
-          'Record these answers in the spec, then add the next round or finalize it.',
+          'Each note applies together with the chosen option(s). Record these answers in the spec, then add the next round or finalize it.',
         ].join('\n');
         return;
       }
