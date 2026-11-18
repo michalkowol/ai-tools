@@ -52,7 +52,7 @@ Source files, relative to this skill directory:
 
    - If `CLAUDE.md` and/or `AGENTS.md` exist, append the note to each of them.
    - If `CLAUDE.md` only contains `@AGENTS.md`, append the note to `AGENTS.md` only.
-   - If neither exists, create `AGENTS.md` with the note and `CLAUDE.md` with the single line `@AGENTS.md`.
+   - If neither exists, create only `AGENTS.md` with the note. Claude Code reads `AGENTS.md` when there is no `CLAUDE.md`.
 
 ## Existing files
 
