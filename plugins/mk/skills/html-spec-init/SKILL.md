@@ -1,6 +1,6 @@
 ---
 name: html-spec-init
-description: Use when setting up a project for HTML specs, or when the user asks to install or update the html-spec skills in a repo - installs the html-spec and html-spec-extract skills into .claude/skills/ so every engineer on the project can use them, and creates .agents/docs/specs, .agents/docs/INDEX.md, local-components.js and a note in CLAUDE.md / AGENTS.md
+description: Use when setting up a project for HTML specs, or when the user asks to install, update or upgrade the html-spec skills in a repo - installs the html-spec and html-spec-extract skills into .claude/skills/ so every engineer on the project can use them, copies style.css and global-components.js, creates .agents/docs/specs, .agents/docs/INDEX.md, local-components.js and a note in CLAUDE.md / AGENTS.md, and on re-run upgrades them and migrates existing specs to the current format
 ---
 
 # HTML Spec Init
@@ -11,7 +11,8 @@ Source files, relative to this skill directory:
 
 - `templates/html-spec/` - planning skill (`SKILL.md`, `template.html`)
 - `templates/html-spec-extract/` - rule of three sweep (`SKILL.md`)
-- `assets/style.css`, `assets/components.js` - global style and components, published on GitHub Pages at `https://michalkowol.github.io/ai-tools/plugins/mk/skills/html-spec-init/assets/`. Never copy them into the project, specs link to the published URLs.
+- `assets/style.css`, `assets/global-components.js` - global style and components. The header of both holds the current spec format (`html-spec format N`).
+- `MIGRATIONS.md` - how to migrate specs from an older format.
 
 ## What it creates in the project
 
@@ -29,12 +30,13 @@ Source files, relative to this skill directory:
    |------|-------|--------|------|
    ```
 
-5. `.agents/docs/specs/local-components.js`:
+5. `.agents/docs/specs/style.css` and `.agents/docs/specs/global-components.js` - copies of `assets/`. Specs link them with relative paths.
+6. `.agents/docs/specs/local-components.js`:
 
    ```js
    /*
     * Project-specific components for the specs in this folder.
-    * Loaded by every spec after the global components.js.
+    * Loaded by every spec after global-components.js.
     *
     * Rule of three: add a component only after the same markup appears
     * at least 3 times across the specs. Prefix elements with local- (never spec-).
@@ -42,7 +44,7 @@ Source files, relative to this skill directory:
     */
    ```
 
-6. A note in the agent instructions file:
+7. A note in the agent instructions file:
 
    ```markdown
    ## Specs
@@ -58,8 +60,18 @@ Source files, relative to this skill directory:
 
 Never overwrite silently. For every file that already exists, show what is there (for skills, a diff against the template) and ask the user whether to keep it, merge, or overwrite it. Ask about each file separately. A file that already matches needs no question, just report it.
 
-Re-running the init is how a project picks up a newer version of the skills.
+Exception: `style.css` and `global-components.js` in `.agents/docs/specs/` are owned by the plugin. Replace them with the current version without asking about each file, and report the format change (e.g. "format 1 → 2"). If a copy differs from `assets/` in a way that looks like a local edit (not just an older version), show the diff and ask before replacing; suggest moving the edit to `local-components.js` or to the plugin.
+
+## Upgrade
+
+Re-running the init is how a project picks up a newer version. Besides updating the skills and the assets:
+
+1. Find the project's current format: the `html-spec format N` header in `.agents/docs/specs/global-components.js`.
+2. Read every `.agents/docs/specs/*.html` and its format: `<meta name="html-spec" content="N">`. A spec without the tag was not created from the template: show it to the user instead of migrating it.
+3. For every spec below the current format, plan the steps from `MIGRATIONS.md`, in order. Show the user the list of specs with their format and what would change (one before / after example per kind of change).
+4. Wait for approval, then apply. Migrate all specs, including `decided` and `implemented` ones. Change structure only, never content, language, decisions or status.
+5. Open one migrated spec in a browser if possible, or at least check that every spec links `style.css`, `global-components.js` and `local-components.js` that exist.
 
 ## Report
 
-At the end list what was created, updated, merged and left unchanged, and remind the user to commit `.claude/skills/` and `.agents/docs/`.
+At the end list what was created, updated, merged and left unchanged, the format change and the migrated specs, and remind the user to commit `.claude/skills/` and `.agents/docs/`.
