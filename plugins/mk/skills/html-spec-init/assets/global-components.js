@@ -233,7 +233,7 @@
       const reset = h('button', { class: 'btn', type: 'button' }, 'Reset answers');
       reset.addEventListener('click', () => {
         if (!confirm('Clear all answers saved in this browser for this spec?')) return;
-        localStorage.removeItem(STORAGE_KEY);
+        try { localStorage.removeItem(STORAGE_KEY); } catch { /* storage unavailable */ }
         location.reload();
       });
       this.append(
