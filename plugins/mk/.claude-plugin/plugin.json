@@ -1,6 +1,6 @@
 {
   "name": "mk",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "description": "Personal slash commands, skills and a guard hook for risky commands",
   "author": {
     "name": "Michał Kowol",

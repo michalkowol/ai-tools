@@ -1,6 +1,9 @@
 /*
  * html-spec global components
- * https://michalkowol.github.io/ai-tools/plugins/mk/skills/html-spec-init/assets/components.js
+ * html-spec format 1
+ *
+ * Copied into .agents/docs/specs/ by /mk:html-spec-init from michalkowol/ai-tools.
+ * Do not edit in the project: changes are made in the plugin and installed by re-running the init.
  *
  * Light DOM custom elements (no shadow DOM), styled by style.css:
  *   <spec-header date status>                     title, date, status
