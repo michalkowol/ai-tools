@@ -30,7 +30,7 @@ Plugin commands are namespaced, e.g. `/mk:commit`.
 
 `/mk:html-spec-init` sets up a project for planning in HTML files. It copies the `html-spec` and `html-spec-extract` skills into the project's `.claude/skills/`, so every engineer can use them without this plugin, and creates `.agents/docs/specs/` with `.agents/docs/INDEX.md`.
 
-The init also copies the global `style.css` and `global-components.js` next to the specs, so specs open from the repo without a server or internet access. Re-running the init upgrades the skills and the assets and migrates existing specs to the current spec format (see `plugins/mk/skills/html-spec-init/MIGRATIONS.md`).
+The init also copies the global `style.css` and `global-components.js` to `.agents/docs/specs/assets/`, so specs open from the repo without a server or internet access. Re-running the init upgrades the skills and the assets and migrates existing specs to the current spec format (see `plugins/mk/skills/html-spec-init/MIGRATIONS.md`).
 
 ## License
 

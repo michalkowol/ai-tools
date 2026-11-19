@@ -1,6 +1,6 @@
 ---
 name: html-spec-init
-description: Use when setting up a project for HTML specs, or when the user asks to install, update or upgrade the html-spec skills in a repo - installs the html-spec and html-spec-extract skills into .claude/skills/ so every engineer on the project can use them, copies style.css and global-components.js, creates .agents/docs/specs, .agents/docs/INDEX.md, local-components.js and a note in CLAUDE.md / AGENTS.md, and on re-run upgrades them and migrates existing specs to the current format
+description: Use when setting up a project for HTML specs, or when the user asks to install, update or upgrade the html-spec skills in a repo - installs the html-spec and html-spec-extract skills into .claude/skills/ so every engineer on the project can use them, copies style.css and global-components.js, creates .agents/docs/specs, .agents/docs/specs/assets, .agents/docs/INDEX.md, local-components.js and a note in CLAUDE.md / AGENTS.md, and on re-run upgrades them and migrates existing specs to the current format
 ---
 
 # HTML Spec Init
@@ -30,8 +30,8 @@ Source files, relative to this skill directory:
    |------|-------|--------|------|
    ```
 
-5. `.agents/docs/specs/style.css` and `.agents/docs/specs/global-components.js` - copies of `assets/`. Specs link them with relative paths.
-6. `.agents/docs/specs/local-components.js`:
+5. `.agents/docs/specs/assets/` with `style.css` and `global-components.js` - copies of `assets/`. Specs link them with relative paths (`assets/style.css`). The folder keeps the specs folder for specs only.
+6. `.agents/docs/specs/assets/local-components.js`:
 
    ```js
    /*
@@ -60,17 +60,17 @@ Source files, relative to this skill directory:
 
 Never overwrite silently. For every file that already exists, show what is there (for skills, a diff against the template) and ask the user whether to keep it, merge, or overwrite it. Ask about each file separately. A file that already matches needs no question, just report it.
 
-Exception: `style.css` and `global-components.js` in `.agents/docs/specs/` are owned by the plugin. Replace them with the current version without asking about each file, and report the format change (e.g. "format 1 → 2"). If a copy differs from `assets/` in a way that looks like a local edit (not just an older version), show the diff and ask before replacing; suggest moving the edit to `local-components.js` or to the plugin.
+Exception: `style.css` and `global-components.js` in `.agents/docs/specs/assets/` are owned by the plugin. Replace them with the current version without asking about each file, and report the format change (e.g. "format 1 → 2"). If a copy differs from `assets/` in a way that looks like a local edit (not just an older version), show the diff and ask before replacing; suggest moving the edit to `local-components.js` or to the plugin.
 
 ## Upgrade
 
 Re-running the init is how a project picks up a newer version. Besides updating the skills and the assets:
 
-1. Find the project's current format: the `html-spec format N` header in `.agents/docs/specs/global-components.js`.
+1. Find the project's current format: the `html-spec format N` header in `.agents/docs/specs/assets/global-components.js`.
 2. Read every `.agents/docs/specs/*.html` and its format: `<meta name="html-spec" content="N">`. A spec without the tag was not created from the template: show it to the user instead of migrating it.
 3. For every spec below the current format, plan the steps from `MIGRATIONS.md`, in order. Show the user the list of specs with their format and what would change (one before / after example per kind of change).
 4. Wait for approval, then apply. Migrate all specs, including `decided` and `implemented` ones. Change structure only, never content, language, decisions or status.
-5. Open one migrated spec in a browser if possible, or at least check that every spec links `style.css`, `global-components.js` and `local-components.js` that exist.
+5. Open one migrated spec in a browser if possible, or at least check that every spec links `assets/style.css`, `assets/global-components.js` and `assets/local-components.js` and that the files exist.
 
 ## Report
 

@@ -15,11 +15,11 @@ This skill only plans. It never implements in the same turn. The implementation 
 
 - Spec: `.agents/docs/specs/YYYY-MM-DD-short-name.html`. The date is the creation date and never changes. `short-name` is a kebab-case English slug, even when the session is in another language.
 - Index: `.agents/docs/INDEX.md`.
-- Global style and components: `.agents/docs/specs/style.css` and `.agents/docs/specs/global-components.js`.
-- Project components: `.agents/docs/specs/local-components.js`.
+- Global style and components: `.agents/docs/specs/assets/style.css` and `.agents/docs/specs/assets/global-components.js`.
+- Project components: `.agents/docs/specs/assets/local-components.js`.
 - Template: `template.html` in this skill directory. Start every spec from it.
 
-This skill was installed into the project by `/mk:html-spec-init` from [michalkowol/ai-tools](https://github.com/michalkowol/ai-tools). The project structure (`.agents/docs/specs/`, `.agents/docs/INDEX.md`, `style.css`, `global-components.js`, `local-components.js`) is created by the init. If any of it is missing, stop and ask the user to run `/mk:html-spec-init` instead of creating it here. The plugin is public:
+This skill was installed into the project by `/mk:html-spec-init` from [michalkowol/ai-tools](https://github.com/michalkowol/ai-tools). The project structure (`.agents/docs/specs/`, `.agents/docs/specs/assets/` with `style.css`, `global-components.js` and `local-components.js`, `.agents/docs/INDEX.md`) is created by the init. If any of it is missing, stop and ask the user to run `/mk:html-spec-init` instead of creating it here. The plugin is public:
 
 ```
 /plugin marketplace add michalkowol/ai-tools
@@ -138,10 +138,10 @@ Newest first. Keep the title in sync with the `<h1>` and the status in sync with
 
 A spec contains structure and content only. No `<style>` blocks, no `style=""` attributes, no inline scripts. Look and behaviour come from:
 
-- `style.css` and `global-components.js` next to the spec (global, installed by the init)
-- `local-components.js` next to the spec (project-specific)
+- `assets/style.css` and `assets/global-components.js` (global, installed by the init)
+- `assets/local-components.js` (project-specific)
 
-All three are linked with relative paths, so a spec opens straight from the repo (`file://`) without a server or internet access. Never edit `style.css` or `global-components.js` in the project: they are owned by the plugin and replaced when the init is re-run. Project-specific needs go to `local-components.js`.
+The `assets/` folder sits next to the specs, so `.agents/docs/specs/` holds only specs. All three are linked with relative paths, so a spec opens straight from the repo (`file://`) without a server or internet access. Never edit `style.css` or `global-components.js` in the project: they are owned by the plugin and replaced when the init is re-run. Project-specific needs go to `local-components.js`.
 
 Every spec declares the spec format it was written for with `<meta name="html-spec" content="N">` (already in `template.html`). The init uses it to migrate old specs when the format changes. Keep the number from the template, do not change it by hand.
 
@@ -224,7 +224,7 @@ Light DOM custom elements, so `style.css` styles them directly. Answers are save
 
 ## local-components.js
 
-Each project may define its own components in `.agents/docs/specs/local-components.js`. Every spec loads it with `<script defer src="local-components.js">`.
+Each project may define its own components in `.agents/docs/specs/assets/local-components.js`. Every spec loads it with `<script defer src="assets/local-components.js">`.
 
 - Rule of three: extract markup into a local component only after the same pattern appears at least 3 times across the project's specs. Until then, repeat the plain HTML.
 - Before writing repeated markup, check the existing specs and `local-components.js`. Reuse a component if one exists.

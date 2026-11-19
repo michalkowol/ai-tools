@@ -1,6 +1,6 @@
 ---
 name: html-spec-extract
-description: Use periodically, or when the user asks to clean up specs or extract shared components - scans .agents/docs/specs/*.html for markup repeated at least 3 times, proposes local components and, after approval, adds them to local-components.js and replaces the markup in all specs
+description: Use periodically, or when the user asks to clean up specs or extract shared components - scans .agents/docs/specs/*.html for markup repeated at least 3 times, proposes local components and, after approval, adds them to assets/local-components.js and replaces the markup in all specs
 ---
 
 # HTML Spec Extract
@@ -17,9 +17,9 @@ Keeps specs created with `html-spec` free of repeated markup by applying the rul
    - before / after markup of one occurrence.
 4. Wait for approval. The user may accept, rename or reject each candidate.
 5. For each accepted candidate:
-   - add the component to `.agents/docs/specs/local-components.js` (light DOM custom element, classes and tokens from `style.css`, extra CSS only through one injected `<style>` tag);
+   - add the component to `.agents/docs/specs/assets/local-components.js` (light DOM custom element, classes and tokens from `style.css`, extra CSS only through one injected `<style>` tag);
    - replace the markup in all specs, including `decided` and `implemented` ones. Change structure only, keep every word of content and every decision as it was.
-6. If a component looks useful outside this project, suggest moving it to `global-components.js` in the ai-tools repo. Do not move it without approval. Never edit `.agents/docs/specs/global-components.js` or `style.css` here: they are owned by the plugin and replaced by `/mk:html-spec-init`.
+6. If a component looks useful outside this project, suggest moving it to `global-components.js` in the ai-tools repo. Do not move it without approval. Never edit `.agents/docs/specs/assets/global-components.js` or `style.css` here: they are owned by the plugin and replaced by `/mk:html-spec-init`.
 7. Report: components added, files changed, candidates rejected.
 
 ## Rules

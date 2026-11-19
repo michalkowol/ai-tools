@@ -2,7 +2,7 @@
  * html-spec global components
  * html-spec format 1
  *
- * Copied into .agents/docs/specs/ by /mk:html-spec-init from michalkowol/ai-tools.
+ * Copied into .agents/docs/specs/assets/ by /mk:html-spec-init from michalkowol/ai-tools.
  * Do not edit in the project: changes are made in the plugin and installed by re-running the init.
  *
  * Light DOM custom elements (no shadow DOM), styled by style.css:
