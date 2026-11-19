@@ -218,7 +218,7 @@ Light DOM custom elements, so `style.css` styles them directly. Answers are save
 
 `<spec-prompt file=".agents/docs/specs/….html">`
 : Textarea with Copy and Reset answers buttons. The text is generated from the page:
-  - open questions present: `/html-spec Round N answers for <file>` and one `Qn: values — labels` line per visible question, with notes;
+  - open questions present: `/html-spec Round N answers for <file>` and one `Qn: A — Label` line per visible question (several picks joined with `; `, "Other" as plain `other`), with notes;
   - no questions, status `draft`: `/html-spec Finalize <file>`;
   - status `decided` or `implemented`: implementation prompt with active decisions (with notes, amendments and tickets) and a "Not decided" block (decisions with `outcome`).
 

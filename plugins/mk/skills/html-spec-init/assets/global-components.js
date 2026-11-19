@@ -42,9 +42,15 @@
 
   const OUTCOMES = ['deferred', 'dropped', 'out-of-scope'];
   const link = (id) => h('a', { href: `#${id}` }, id);
-  const ticketRef = (value) => (/^https?:\/\//.test(value)
-    ? h('a', { class: 'pill ticket', href: value, target: '_blank', rel: 'noopener' }, new URL(value).hostname.replace(/^www\./, ''))
-    : h('span', { class: 'tag ticket' }, value));
+  const ticketRef = (value) => {
+    if (/^https?:\/\//.test(value)) {
+      try {
+        const host = new URL(value).hostname.replace(/^www\./, '');
+        return h('a', { class: 'pill ticket', href: value, target: '_blank', rel: 'noopener' }, host);
+      } catch { /* malformed URL: render as plain ticket text */ }
+    }
+    return h('span', { class: 'tag ticket' }, value);
+  };
   const topicPill = (el) => (el.getAttribute('topic') ? h('span', { class: 'pill topic' }, el.getAttribute('topic')) : null);
 
   const parseCondition = (expr) => {
@@ -246,10 +252,8 @@
         const round = Math.max(...questions.map((q) => Number(q.getAttribute('round')) || 1));
         const lines = questions.filter((q) => !q.hidden).map((q) => {
           const { values, labels, note } = q.answer;
-          const named = labels.filter((_, i) => values[i] !== 'other');
           const answer = !values.length ? '(no answer)'
-            : named.length ? `${values.join(', ')} — ${named.join('; ')}`
-            : values.join(', ');
+            : values.map((v, i) => (v === 'other' ? v : `${v} — ${labels[i]}`)).join('; ');
           return `${q.qid}: ${answer}${note ? `\n    Note: ${note}` : ''}`;
         });
         this._mode.textContent = `Round ${round} answers`;
