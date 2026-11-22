@@ -12,6 +12,12 @@
       "description": "Personal slash commands, skills and a guard hook for risky commands",
       "source": "./plugins/mk",
       "category": "productivity"
+    },
+    {
+      "name": "daily-workflow",
+      "description": "Work Logger hooks that log work from parallel sessions into a local Worklog, and a Daily Briefing built from it",
+      "source": "./plugins/daily-workflow",
+      "category": "productivity"
     }
   ]
 }

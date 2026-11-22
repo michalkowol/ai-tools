@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Publishing the daily-workflow plugin in the public marketplace</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-22" status="implemented">
+    <h1>Publishing the daily-workflow plugin in the public marketplace</h1>
+    <p>Where the <code>daily-workflow</code> plugin lives, how to remove private and company data from it before the first commit to the public repo, and how to simplify its documentation.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>The <code>daily-workflow</code> plugin (Work Logger and Daily Briefing) started as a private tool and was moved into the marketplace next to <code>mk</code>. The marketplace repo is public, and the plugin's config, skills and tests hold data from a private Notion workspace, the company name, a Jira project key and names of colleagues. The files are staged but not committed yet, so they can be cleaned without rewriting history.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <h3>Repo and plugin</h3>
+    <ul>
+      <li>The marketplace repo is public. <cite><code>gh repo view --json visibility</code></cite></li>
+      <li>The plugin lives in <code>plugins/daily-workflow</code> and is a separate marketplace entry. <cite><code>.claude-plugin/marketplace.json</code></cite></li>
+      <li>The plugin has no commit yet, its files are only staged. <cite><code>git status</code>, <code>git log -- plugins/daily-workflow</code></cite></li>
+      <li>Hooks run on SessionStart, Stop, PreCompact, SessionEnd and PostToolUse for Bash and MCP, and start <code>claude -p</code> with Haiku every 15 minutes of work. <cite><code>hooks/hooks.json</code>, <code>scripts/wl/collector.py</code></cite></li>
+      <li>This session already removed dead code (the fallback TOML parser, unused CLI options), references to decisions in a spec outside this repo and outdated instructions (the launcher patch). Tests pass. <cite>session 2026-11-22</cite></li>
+    </ul>
+    <h3>Private and company data</h3>
+    <ul>
+      <li><code>config.example.toml</code> holds the database URL and 6 view or data source IDs of a private Notion workspace, the company Jira URL, the project key and example channel names. <cite><code>config.example.toml</code> sections <code>[notion]</code>, <code>[worklog]</code>, <code>[slack]</code></cite></li>
+      <li>The local <code>~/.ai/worklog/config.toml</code> already exists with the real Notion IDs, so the example is only needed on first install. <cite><code>~/.ai/worklog/config.toml</code></cite></li>
+      <li>Colleagues' names appear in examples in <code>plan-schema.md</code>, <code>gtd-rules.md</code> and the tests. <cite><code>skills/briefing/references/*.md</code>, <code>tests/test_worklog.py</code></cite></li>
+      <li>Names of recurring cards from the private Notion, in Polish, appear in <code>gtd-rules.md</code> and <code>plan-schema.md</code>. <cite><code>gtd-rules.md</code> section Workday plan</cite></li>
+      <li>The Jira project key is hardcoded in the briefing rules, <code>sources.md</code>, the example in the summarizer prompt, the worklog skill, the README and the tests. The code reads keys only from <code>[worklog].jira_project_keys</code>. <cite><code>skills/briefing/SKILL.md</code>, <code>sources.md</code>, <code>scripts/wl/summarizer.py</code>, <code>scripts/wl/core.py</code></cite></li>
+      <li><code>[notion].jira_base_url</code> is read only by the skills, the code does not use it. <cite><code>grep jira_base_url scripts</code></cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>The GTD model in Notion (statuses, priorities, estimates): it describes a way of working and holds no data.</li>
+      <li>Author and email in <code>plugin.json</code>: the same as in <code>mk</code> and already public.</li>
+      <li>Changes to the behaviour of the Work Logger and the briefing.</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Plugin">
+      <p class="q">Should daily-workflow stay a separate plugin or move into mk?</p>
+      <spec-option value="A" label="Separate plugin" recommended chosen>The hooks run on every response and start paid Haiku calls, so they are installed on purpose and can be disabled without touching mk. Own version.</spec-option>
+      <spec-option value="B" label="Part of mk">One install and one version, but the hooks and the Worklog directory show up wherever mk is installed, also outside the container.</spec-option>
+      <p class="why">Hooks with side effects and token cost should be opt-in and independently disabled; mk stays a set of stateless skills and commands.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Private data">
+      <p class="q">What goes into config.example.toml instead of the real values?</p>
+      <spec-option value="A" label="Fictional values in the right format" recommended chosen>E.g. <code>view://00000000-…</code>, <code>https://example.atlassian.net</code>, <code>["PROJ"]</code>. The format is visible and nothing is revealed.</spec-option>
+      <spec-option value="B" label="Empty values with a comment">Safest, but the format has to be guessed.</spec-option>
+      <spec-option value="C" label="Keep the real ones">Works right away, but publishes the Notion IDs and the company name.</spec-option>
+      <p class="why">The real values already live in the local <code>~/.ai/worklog/config.toml</code>; the example only has to show the format.</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Private data">
+      <p class="q">How to anonymize the examples in the skills, the tests and the summarizer prompt?</p>
+      <spec-option value="A" label="Everything to neutral fictional values" recommended chosen>Names like Alice/Bob, the key <code>PROJ-1234</code>, card names in English, no company name. The examples still make sense.</spec-option>
+      <spec-option value="B" label="Only company and project">Names stay, since without surnames they do not identify people.</spec-option>
+      <spec-option value="C" label="Keep">No change.</spec-option>
+      <p class="why">A public repo should not name colleagues, the company or the project, and fictional examples teach the model the same thing.</p>
+    </spec-decision>
+
+    <spec-decision did="D4" round="1" from="Q4" topic="Private data">
+      <p class="q">What about rules that assume a specific Jira project?</p>
+      <spec-option value="A" label="Generic, project from the config" recommended chosen>The skill says "a ticket from <code>[worklog].jira_project_keys</code>" and takes the Jira URL from <code>[notion].jira_base_url</code>. Works for any project.</spec-option>
+      <spec-option value="B" label="Only rename it">Fewest changes, but the rule still describes one specific project.</spec-option>
+      <p class="why">The code already reads project keys from the config, so the skills follow the same source instead of a hardcoded name.</p>
+    </spec-decision>
+
+    <spec-decision did="D5" round="1" from="Q5" topic="Documentation">
+      <p class="q">Remove the duplication between briefing/SKILL.md and references/?</p>
+      <spec-option value="A" label="Details only in references" recommended chosen>SKILL.md lists the steps and points to the file. One place to change.</spec-option>
+      <spec-option value="B" label="Keep">The model has the rules at hand even if it does not open the reference file, but they drift apart easily.</spec-option>
+      <p class="why">One source per rule avoids the two copies drifting apart; SKILL.md already tells the model to read the references first.</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-22-daily-workflow-plugin-cleanup.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>

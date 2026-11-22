@@ -1,0 +1,18 @@
+{
+  "name": "daily-workflow",
+  "version": "0.1.0",
+  "description": "Personal Work Logger (hooks that log work from parallel Claude Code sessions into a local Worklog) and Daily Briefing (morning plan, post-daily update and home mode from the Worklog, GitHub, Calendar, Jira, Slack, Gmail and Notion).",
+  "author": {
+    "name": "Michał Kowol",
+    "email": "michal.kowol@gmail.com"
+  },
+  "repository": "https://github.com/michalkowol/ai-tools",
+  "license": "MIT",
+  "keywords": [
+    "worklog",
+    "daily",
+    "briefing",
+    "planning",
+    "hooks"
+  ]
+}

@@ -1,0 +1,50 @@
+# Worklog and Daily Briefing configuration.
+# Copied to ~/.ai/worklog/config.toml on first use. Edit that copy.
+
+[worklog]
+# Model for Worklog Entry summaries.
+model = "claude-haiku-5-5"
+# A Stop hook starts a summary when this many minutes passed since the last one.
+summary_threshold_minutes = 15
+summary_timeout_seconds = 240
+# Jira project keys recognised in branch and worktree names. Empty = any KEY-123.
+jira_project_keys = ["PROJ"]
+
+[time]
+# Empty = the container's TZ. A name such as "Europe/Warsaw" needs tzdata in the image.
+timezone = ""
+
+[workday]
+start = "09:00"
+end = "17:30"
+# Title of the team daily in Google Calendar. Its presence decides when the
+# Deep Work block is created.
+daily_event_title = "Daily"
+
+[deep_work]
+min_minutes = 90
+target_minutes = 120
+event_title = "Deep Work"
+# Marker in the event description, so the briefing only ever changes its own events.
+event_marker = "[daily-workflow:deep-work]"
+
+[github]
+# Team repos whose open PRs are reviewed too, as "owner/name".
+team_repos = []
+
+[slack]
+# Followed channels, e.g. ["#team-proj", "#proj-alerts"].
+channels = []
+# Optional. Empty = taken from the Slack connector's search tool description.
+user_id = ""
+
+[notion]
+# ✅ GTD database and its views. Replace with your own IDs.
+database_url = "https://app.notion.com/p/00000000000000000000000000000000"
+data_source = "collection://00000000-0000-0000-0000-000000000000"
+view_top = "view://00000000-0000-0000-0000-000000000001"
+view_overdue = "view://00000000-0000-0000-0000-000000000002"
+view_waiting_for = "view://00000000-0000-0000-0000-000000000003"
+view_agenda_errands = "view://00000000-0000-0000-0000-000000000004"
+view_inbox = "view://00000000-0000-0000-0000-000000000005"
+jira_base_url = "https://example.atlassian.net"
