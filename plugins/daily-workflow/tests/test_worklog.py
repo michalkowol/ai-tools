@@ -15,7 +15,7 @@ from unittest import mock
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from wl import collector, core, plan, summarizer, views  # noqa: E402
+from wl import collector, core, inbox, plan, summarizer, views  # noqa: E402
 
 FAKE_CLAUDE = textwrap.dedent(
     """\
@@ -322,6 +322,102 @@ class PlanTest(WorklogTestCase):
         self.assertIn("proposed, created after the daily", page)
         self.assertIn("Missing sources", page)
         self.assertNotIn("Resolved", page)
+
+
+class InboxTest(WorklogTestCase):
+    run_cli = CliTest.run_cli
+
+    def test_first_window_starts_at_last_workday(self):
+        win = json.loads(self.run_cli("inbox", "start").stdout)
+        self.assertTrue(win["first_run"])
+        expected = core.last_workday(core.now().date()).isoformat()
+        self.assertEqual(win["since_date"], expected)
+        self.assertTrue(win["since"].startswith(expected + "T00:00:00"))
+
+    def test_record_moves_cursor_and_filters_duplicates(self):
+        urls = ["https://team.slack.com/archives/C1/p1?thread_ts=1.2", "https://github.com/org/shop/pull/412/"]
+        out = self.run_cli("inbox", "record", "--cursor", "2026-11-23T09:30:00+01:00", stdin=json.dumps(urls))
+        self.assertEqual(out.returncode, 0, out.stderr)
+        win = json.loads(self.run_cli("inbox", "start").stdout)
+        self.assertFalse(win["first_run"])
+        self.assertEqual(win["since"], "2026-11-23T09:30:00+01:00")
+        checked = json.loads(self.run_cli("inbox", "check", stdin=json.dumps([
+            "https://github.com/org/shop/pull/412",
+            "https://team.slack.com/archives/C1/p1?thread_ts=9.9",
+            "https://mail.google.com/mail/u/0/#all/abc",
+        ])).stdout)
+        self.assertEqual(checked["known"], ["https://github.com/org/shop/pull/412"])
+        self.assertEqual(len(checked["new"]), 2)
+
+    def test_record_without_cursor_keeps_window(self):
+        self.run_cli("inbox", "record", "--cursor", "2026-11-23T09:30:00+01:00", stdin="[]")
+        self.run_cli("inbox", "record", "https://mail.google.com/mail/u/0/#all/abc")
+        state = json.loads(inbox.state_path().read_text())
+        self.assertEqual(state["cursor"], "2026-11-23T09:30:00+01:00")
+        self.assertEqual(len(state["seen"]), 1)
+        checked = json.loads(self.run_cli("inbox", "check", "https://mail.google.com/mail/u/0/#all/abc",
+                                          "https://mail.google.com/mail/u/0/#all/xyz").stdout)
+        self.assertEqual(checked["known"], ["https://mail.google.com/mail/u/0/#all/abc"])
+
+    def test_registry_prunes_after_30_days(self):
+        old = (core.now() - dt.timedelta(days=31)).isoformat(timespec="seconds")
+        core.write_json_atomic(inbox.state_path(), {"cursor": "", "seen": {"https://x.test/old": old}})
+        self.assertEqual(inbox.check(["https://x.test/old"])["new"], ["https://x.test/old"])
+        inbox.record(["https://x.test/new"], None)
+        self.assertEqual(list(json.loads(inbox.state_path().read_text())["seen"]), ["https://x.test/new"])
+
+    def test_order_blocking_then_due_then_oldest(self):
+        cards = [
+            {"id": "old", "created_at": "2026-11-20T10:00:00+01:00"},
+            {"id": "newer", "created_at": "2026-11-22T10:00:00+01:00"},
+            {"id": "due", "created_at": "2026-11-22T11:00:00+01:00", "proposal": {"due": "2026-11-25"}},
+            {"id": "blocking", "created_at": "2026-11-22T12:00:00+01:00", "waiting_on_me": True},
+            {"title": "no id"},
+        ]
+        self.assertEqual([c["id"] for c in inbox.order(cards)], ["blocking", "due", "old", "newer"])
+
+    def test_render_escapes_and_prefills_proposal(self):
+        core.ensure_home()
+        data = {
+            "date": "2026-11-23", "generated_at": "2026-11-23T09:31:04+01:00",
+            "captured": {"created": 1, "skipped": 2},
+            "projects": ["Hiring"],
+            "agenda_cards": [{"id": "a1", "name": "Alice"}],
+            "cards": [{
+                "id": "p1", "url": "javascript:alert(1)", "title": "<img src=x onerror=alert(1)>",
+                "source": {"label": "Slack DM", "url": "https://team.slack.com/x"},
+                "quote": "</script><script>alert(2)</script>",
+                "waiting_on_me": True,
+                "proposal": {"outcome": "next", "title": "Reply to Alice", "category": ["Work"],
+                             "estimate": "0.5 x 🍅", "priority": "P1", "reminder": "2026-11-23", "project": "Hiring",
+                             "why": "Direct ask."},
+            }],
+            "missing_sources": [{"source": "Gmail", "reason": "not signed in"}],
+        }
+        path = inbox.inbox_dir() / "2026-11-23-0931.json"
+        path.write_text(json.dumps(data))
+        out = self.run_cli("render-inbox", "inbox/2026-11-23-0931.json")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("2026-11-23-0931.html", out.stdout)
+        page = path.with_suffix(".html").read_text()
+        self.assertNotIn("<img src=x", page)
+        self.assertNotIn("alert(2)</script>", page)
+        self.assertNotIn("javascript:", page)
+        self.assertIn('href="https://team.slack.com/x"', page)
+        self.assertIn('data-file="inbox/2026-11-23-0931.json"', page)
+        self.assertIn('value="next" checked', page)
+        self.assertIn('<option value="0.5 x 🍅" selected>', page)
+        self.assertIn('<option value="Hiring" selected>', page)
+        self.assertIn('value="Reply to Alice"', page)
+        self.assertIn("someone is waiting", page)
+        self.assertIn("Missing sources", page)
+
+    def test_render_empty_inbox(self):
+        core.ensure_home()
+        path = inbox.inbox_dir() / "2026-11-23-1000.json"
+        path.write_text(json.dumps({"date": "2026-11-23", "cards": []}))
+        page = inbox.render_file(path, "inbox/2026-11-23-1000.json").read_text()
+        self.assertIn("Inbox zero.", page)
 
 
 if __name__ == "__main__":

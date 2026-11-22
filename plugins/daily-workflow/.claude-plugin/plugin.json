@@ -1,7 +1,7 @@
 {
   "name": "daily-workflow",
-  "version": "0.1.0",
-  "description": "Personal Work Logger (hooks that log work from parallel Claude Code sessions into a local Worklog) and Daily Briefing (morning plan, post-daily update and home mode from the Worklog, GitHub, Calendar, Jira, Slack, Gmail and Notion).",
+  "version": "0.2.0",
+  "description": "Personal Work Logger (hooks that log work from parallel Claude Code sessions into a local Worklog), Daily Briefing (morning plan, post-daily update and home mode from the Worklog, GitHub, Calendar, Jira, Slack, Gmail and Notion) and Inbox (capture Slack, PRs and email into the Notion GTD Inbox and process it on one HTML form).",
   "author": {
     "name": "Michał Kowol",
     "email": "michal.kowol@gmail.com"
@@ -12,6 +12,8 @@
     "worklog",
     "daily",
     "briefing",
+    "inbox",
+    "gtd",
     "planning",
     "hooks"
   ]

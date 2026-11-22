@@ -8,6 +8,8 @@ Usage (the most common ones):
   worklog.py context                      # Worklog context for the briefing (JSON)
   worklog.py github                       # pull request data for the briefing (JSON)
   worklog.py render-plan plans/2026-11-23.json
+  worklog.py inbox start|check|record       # inbox capture state (JSON)
+  worklog.py render-inbox inbox/2026-11-23-0930.json
 """
 from __future__ import annotations
 
@@ -20,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from wl import collector, core, github, plan, summarizer, views  # noqa: E402
+from wl import collector, core, github, inbox, plan, summarizer, views  # noqa: E402
 
 
 def host_path(path: Path) -> str:
@@ -158,6 +160,43 @@ def cmd_render_plan(args) -> int:
     return 0
 
 
+def read_urls(args) -> list[str]:
+    if args.urls:
+        return args.urls
+    if sys.stdin.isatty():
+        return []
+    raw = sys.stdin.read().strip()
+    data = json.loads(raw) if raw else []
+    if not isinstance(data, list):
+        raise SystemExit("expected a JSON list of URLs on stdin")
+    return [str(u) for u in data if u]
+
+
+def cmd_inbox(args) -> int:
+    core.ensure_home()
+    if args.action == "start":
+        dump(inbox.start())
+    elif args.action == "check":
+        dump(inbox.check(read_urls(args)))
+    else:
+        dump(inbox.record(read_urls(args), args.cursor))
+    return 0
+
+
+def cmd_render_inbox(args) -> int:
+    path = Path(args.path)
+    if not path.is_absolute() and not path.exists():
+        path = core.home() / path
+    path = path.resolve()
+    try:
+        label = str(path.relative_to(core.home().resolve()))
+    except ValueError:
+        label = str(path)
+    html_path = inbox.render_file(path, label)
+    print(f"open {host_path(html_path)}")
+    return 0
+
+
 def cmd_init(args) -> int:
     root = core.ensure_home()
     print(f"Worklog ready in {root}")
@@ -227,6 +266,16 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("render-plan", help="render a plan JSON into HTML")
     p.add_argument("path")
     p.set_defaults(func=cmd_render_plan)
+
+    p = sub.add_parser("inbox", help="inbox capture state: window, duplicate check, record")
+    p.add_argument("action", choices=("start", "check", "record"))
+    p.add_argument("urls", nargs="*", help="source URLs (or a JSON list on stdin)")
+    p.add_argument("--cursor", help="record: the started_at of this capture")
+    p.set_defaults(func=cmd_inbox)
+
+    p = sub.add_parser("render-inbox", help="render an inbox JSON into the processing page")
+    p.add_argument("path")
+    p.set_defaults(func=cmd_render_inbox)
 
     p = sub.add_parser("init", help="create the Worklog directory, git repo and config")
     p.set_defaults(func=cmd_init)

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Inbox: capture into Notion and fast processing</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-22" status="implemented">
+    <h1>Inbox: capture into Notion and fast processing</h1>
+    <p>A new skill in <code>daily-workflow</code>: collect in one place (status Inbox in the Notion ✅ GTD database) everything from Slack, GitHub and Gmail that should land in the inbox, then process those cards as fast as possible.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>The briefing reads Slack, GitHub and Gmail, but only to plan the day: nothing of it stays in the GTD system. Things that need action are spread over several apps. Goal: one place (status Inbox in Notion ✅ GTD) that receives everything it should, followed by fast GTD processing of the cards, so the Inbox ends up empty.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <h3>Plugin</h3>
+    <ul>
+      <li>The plugin has two skills, <code>briefing</code> and <code>worklog</code>, sharing the CLI <code>scripts/worklog.py</code> with commands such as <code>dates</code>, <code>github</code>, <code>render-plan</code>. <cite><code>plugins/daily-workflow/scripts/worklog.py</code></cite></li>
+      <li><code>worklog github</code> already returns <code>review_requested</code>, <code>team_repo_prs</code> and <code>my_prs</code>. <cite><code>skills/briefing/references/sources.md</code></cite></li>
+      <li>The briefing already has the Slack queries (DMs, channels, mentions, <code>is:saved</code>) and the Gmail query, plus the rule "a reply or a reaction = handled". <cite><code>sources.md</code> sections Slack and Gmail</cite></li>
+      <li>The config has <code>[notion].view_inbox</code>, but no skill uses it. <cite><code>config.example.toml</code></cite></li>
+      <li>Per-run state fits into <code>~/.ai/worklog/state/</code>. <cite>README, Worklog layout</cite></li>
+      <li><code>render-plan</code> renders a fixed HTML template from JSON, without JavaScript, escapes text and prints the <code>open …</code> command for the host. <cite><code>scripts/wl/plan.py</code></cite></li>
+      <li>The spec components store answers in <code>localStorage</code> and generate a prompt to copy. <cite><code>.agents/docs/specs/assets/global-components.js</code></cite></li>
+      <li>A page opened on the host through <code>file://</code> cannot write a file into <code>~/.ai/worklog</code>. A downloaded file lands in the host's Downloads, outside the container. <cite>browser model, README (<code>open</code> command on the host)</cite></li>
+    </ul>
+    <h3>Notion</h3>
+    <ul>
+      <li>Status has the value Inbox; a card without Status, Category or Estimate lands in the Inbox view. <cite><code>gtd-rules.md</code></cite></li>
+      <li>Current rule: never change Notion without consent, never create new projects, tags and projects only from existing options. <cite><code>gtd-rules.md</code> Rules for changes</cite></li>
+      <li>The card URL field is available in SQL as <code>userDefined:URL</code>; SQL mode has an hourly limit. <cite><code>gtd-rules.md</code> Connection</cite></li>
+    </ul>
+    <h3>Connectors</h3>
+    <ul>
+      <li>Slack search has no unread filter; the connector has no tool to mark messages as read. It has <code>slack_send_message_draft</code> and <code>slack_add_reaction</code>. <cite>Slack MCP tool descriptions</cite></li>
+      <li>Gmail is not signed in in this session (only <code>authenticate</code> is available). <cite>MCP tool list</cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Changes to the briefing: capture runs manually only (<a href="#D2">D2</a>).</li>
+      <li>Jira as an Inbox source (<a href="#D3">D3</a>).</li>
+      <li>Draft replies and reactions in the sources (<a href="#D10">D10</a>, <a href="#D14">D14</a>).</li>
+      <li>Sending messages, emails or PR comments.</li>
+      <li>The GTD model in Notion (statuses, fields).</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Shape">
+      <p class="q">How to split the skill?</p>
+      <spec-option chosen value="A" label="One inbox skill with two modes" recommended><code>/daily-workflow:inbox</code> captures and immediately proposes the processing, <code>/daily-workflow:inbox process</code> only processes. One place for the rules and the state.</spec-option>
+      <spec-option value="B" label="Two separate skills">E.g. <code>capture</code> and <code>process</code>. Clearer names, but duplicated source and Notion rules.</spec-option>
+      <spec-option value="C" label="A step in the briefing">The briefing captures into the Inbox first. Fewer commands, but the briefing gets longer and the inbox cannot be run on its own during the day.</spec-option>
+      <p class="why">One place for the source rules and the cursor state. Capture flows straight into processing, and <code>process</code> is enough when only processing is needed.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Shape">
+      <p class="q">When does capture run?</p>
+      <spec-option chosen value="A" label="Manually" recommended>Only the command. Full control, no background cost.</spec-option>
+      <spec-option value="B" label="Manually + at the start of the briefing">The briefing captures first (without processing), then plans with the full picture.</spec-option>
+      <spec-option value="C" label="Periodically (/loop or schedule)">The Inbox is always fresh, but it runs without the user and costs tokens.</spec-option>
+      <p class="why">Full control and no background token cost.</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Sources">
+      <p class="q">Which sources to capture?</p>
+      <spec-option chosen value="A" label="Slack: DMs, group DMs and mentions" recommended></spec-option>
+      <spec-option chosen value="B" label="Slack: followed channels from [slack].channels" recommended>Only threads that want something from the user, not every post.</spec-option>
+      <spec-option chosen value="C" label="Slack: saved items (is:saved, To-dos)" recommended></spec-option>
+      <spec-option chosen value="D" label="GitHub: PRs waiting for my review" recommended></spec-option>
+      <spec-option chosen value="E" label="GitHub: my PRs that need action" recommended>Changes requested, failing CI.</spec-option>
+      <spec-option chosen value="F" label="Gmail: important email" recommended></spec-option>
+      <spec-option value="G" label="Jira: new tickets assigned to me">They usually arrive through the sprint anyway, easy to duplicate.</spec-option>
+      <p class="why">Everything that can ask something of the user during the day. Jira stays out, because sprint tickets reach Notion through the briefing and would create duplicates.</p>
+    </spec-decision>
+
+    <spec-decision did="D4" round="1" from="Q4" topic="Sources">
+      <p class="q">What does "unread" mean on Slack?</p>
+      <spec-option chosen value="A" label="Since the last capture, without my reply or reaction" recommended>A cursor with the time of the last run in <code>~/.ai/worklog/state/</code>. A message drops out if the user replied in the thread or added any reaction (the same rule as in the briefing).</spec-option>
+      <spec-option value="B" label="Time window (since the last workday)">No state, but with several runs a day the same items come back (only deduplication stops them).</spec-option>
+      <spec-option value="C" label="Everything in the window, including replied ones">Nothing is missed, but a lot of noise to process.</spec-option>
+      <p class="why">The connector has no read state, so a cursor plus the briefing rule (reply or reaction = handled) is the closest approximation.</p>
+    </spec-decision>
+
+    <spec-decision did="D5" round="1" from="Q5" topic="Sources">
+      <p class="q">What is "important email"?</p>
+      <spec-option chosen value="A" label="Primary, unread, with a request or question to me" recommended>As in the briefing: <code>in:inbox category:primary is:unread</code>, without GitHub/Jira notifications; the model judges whether someone wants something.</spec-option>
+      <spec-option value="B" label="Gmail's Important label"><code>is:important is:unread</code>. Simple, but Gmail also marks newsletters as Important.</spec-option>
+      <spec-option value="C" label="Starred only">Full control, but needs manual starring in Gmail.</spec-option>
+      <p class="why">The same query as the briefing, without notification mail. The model keeps only mail where someone wants something.</p>
+    </spec-decision>
+
+    <spec-decision did="D6" round="1" from="Q6" topic="Cards">
+      <p class="q">How to avoid duplicates?</p>
+      <spec-option value="A" label="By the source URL in the card's URL field" recommended>Before creating, check whether any card (not only in the Inbox) has the same link to the message, PR or email. Also works after processing.</spec-option>
+      <spec-option value="B" label="Local registry in the Worklog">A file with the IDs of captured items. Faster, but does not know about cards added by hand.</spec-option>
+      <spec-option chosen value="C" label="Both">The registry as a fast filter, the URL in Notion as the final check.</spec-option>
+      <p class="why">The local registry quickly filters known items, and the URL check in Notion also catches cards added by hand and works after processing.</p>
+    </spec-decision>
+
+    <spec-decision did="D7" round="1" from="Q7" topic="Cards">
+      <p class="q">How many cards per item?</p>
+      <spec-option chosen value="A" label="One card per thread / PR / email" recommended>Each card is one decision during processing.</spec-option>
+      <spec-option value="B" label="One card per person or channel">Fewer cards, but one card can hold several different actions.</spec-option>
+      <spec-option value="C" label="Like A, but bot PRs in one card">Renovate and similar grouped, the rest separate.</spec-option>
+      <p class="why">Each card is one decision during processing.</p>
+    </spec-decision>
+
+    <spec-decision did="D8" round="1" from="Q8" topic="Cards">
+      <p class="q">Does creating cards in the Inbox need consent?</p>
+      <spec-option chosen value="A" label="No consent, only new cards with status Inbox" recommended>The Inbox is unprocessed by definition, so creating cards there is a safe exception. No edits of existing cards without consent.</spec-option>
+      <spec-option value="B" label="A list to approve before creating">Consistent with the current rule, but in practice it is processing twice.</spec-option>
+      <p class="why">The Inbox by definition holds unprocessed items, so creating cards there is a safe exception to the consent rule. Existing cards are never changed without consent.</p>
+    </spec-decision>
+
+    <spec-decision did="D9" round="1" from="Q9" topic="Cards">
+      <p class="q">What does a card contain?</p>
+      <spec-option chosen value="A" label="Action title + short quote + link" recommended>E.g. "Reply to Alice about the API contract"; the body holds a short verbatim quote, author, time, channel. Source URL in the URL field. Category Work, English.</spec-option>
+      <spec-option value="B" label="Raw title from the source">PR title / email subject / start of the message. Less interpretation, slower to process.</spec-option>
+      <p class="why">An action title speeds up processing, and the quote and the link give the context without opening the source.</p>
+    </spec-decision>
+
+    <spec-decision did="D10" round="1" from="Q10" topic="Cards">
+      <p class="q">Should anything change in the sources after capture?</p>
+      <spec-option chosen value="A" label="No" recommended>The plugin never sends anything. Slack cannot mark messages as read anyway.</spec-option>
+      <spec-option value="B" label="Emoji reaction on Slack">E.g. 📥 on the captured message, visible to everyone in the channel. Replaces the cursor from Q4.</spec-option>
+      <p class="why">The plugin never sends anything, and Slack cannot mark messages as read anyway.</p>
+    </spec-decision>
+
+    <spec-decision did="D11" round="1" from="Q11" topic="Processing">
+      <p class="q">What should processing look like?</p>
+      <spec-option value="A" label="AskUserQuestion, 4 cards per round" recommended>Each question is one card, the AI proposal is the first option (Recommended), the rest are alternatives. Enter, Enter, Enter.</spec-option>
+      <spec-option chosen value="B" label="HTML page with a form">All cards at once, answers pasted back as a prompt like in the specs. Fast review of many cards, but switching windows.</spec-option>
+      <spec-option value="C" label="Table in the chat">Proposals in a table, the user answers "ok" or corrections like "3: someday".</spec-option>
+      <p class="why">All cards are visible at once, which is faster for a large Inbox. Answers come back as a pasted prompt like in the specs. Details in <a href="#D17">D17</a>–<a href="#D21">D21</a>.</p>
+    </spec-decision>
+
+    <spec-decision did="D12" round="1" from="Q12" topic="Processing">
+      <p class="q">What does the AI propose for a card?</p>
+      <spec-option chosen value="A" label="Full classification" recommended>Status, Estimate, priority, Reminder / Due Date, optionally Project from existing options. Approved with one click.</spec-option>
+      <spec-option value="B" label="Status only">Faster to read, but a card without Estimate falls back into the Inbox view (rule from gtd-rules).</spec-option>
+      <p class="why">One-click approval only works with a full proposal. A card without Estimate falls back into the Inbox view.</p>
+    </spec-decision>
+
+    <spec-decision did="D13" round="1" from="Q13" topic="Processing">
+      <p class="q">Which GTD outcomes are available for a card?</p>
+      <spec-option chosen value="A" label="Done now (two-minute rule) → Done" recommended></spec-option>
+      <spec-option chosen value="B" label="Next Actions with a Reminder" recommended></spec-option>
+      <spec-option chosen value="C" label="Waiting for with a follow-up date" recommended></spec-option>
+      <spec-option chosen value="D" label="Append to a person's Agenda card" recommended>The topic goes into the body of the person's card, the Inbox card is archived.</spec-option>
+      <spec-option chosen value="E" label="Someday/Maybe or Icebox" recommended></spec-option>
+      <spec-option chosen value="F" label="Trash (archive the page)" recommended></spec-option>
+      <spec-option value="G" label="Projects (new project)">The current rule forbids creating projects.</spec-option>
+      <p class="why">The standard GTD outcomes. Creating projects stays forbidden by the existing rule.</p>
+    </spec-decision>
+
+    <spec-decision did="D14" round="1" from="Q14" topic="Processing">
+      <p class="q">What happens on "done now"?</p>
+      <spec-option chosen value="A" label="Only mark it Done (today)" recommended>The user does it in Slack / GitHub / Gmail.</spec-option>
+      <spec-option value="B" label="The agent prepares a draft reply">A draft in Slack (<code>slack_send_message_draft</code>) or Gmail, nothing is sent. Faster, but longer processing.</spec-option>
+      <p class="why">The user acts in the source app; the plugin sends and drafts nothing.</p>
+    </spec-decision>
+
+    <spec-decision did="D15" round="1" from="Q15" topic="Processing">
+      <p class="q">Which cards to process?</p>
+      <spec-option chosen value="A" label="The whole Inbox view" recommended>Including cards added by hand and from the phone. Inbox zero.</spec-option>
+      <spec-option value="B" label="Only the cards from this capture">Faster, but manual cards stay.</spec-option>
+      <p class="why">Inbox zero includes cards added by hand and from the phone.</p>
+    </spec-decision>
+
+    <spec-decision did="D16" round="1" from="Q16" topic="Processing">
+      <p class="q">In what order are cards shown?</p>
+      <spec-option chosen value="A" label="Blocking others first" recommended>Someone is waiting (a direct question, a review), then cards with a deadline, then the rest, oldest first.</spec-option>
+      <spec-option value="B" label="Chronologically">Oldest first, predictable.</spec-option>
+      <spec-option value="C" label="Grouped by source">Slack, PRs, email. Easier to keep the context.</spec-option>
+      <p class="why">Unblocking others first, then deadlines, then the rest oldest first.</p>
+    </spec-decision>
+
+    <spec-decision did="D17" round="2" from="Q17" topic="HTML page">
+      <p class="q">How do the answers from the page get back into the session?</p>
+      <spec-option chosen value="A" label="Prompt to copy" recommended>Like in the specs: a Copy button, paste into the session. Answers in <code>localStorage</code>, so a page reload keeps them. Works through <code>file://</code>.</spec-option>
+      <spec-option value="B" label="Downloaded JSON file">Less text in the chat, but the file lands in the host's Downloads and has to be moved into the container.</spec-option>
+      <spec-option value="C" label="Local HTTP server in the container">Saved with one click, but needs an exposed port and a background process.</spec-option>
+      <p class="why">The only option that works from <code>file://</code> on the host without moving files or running a server.</p>
+    </spec-decision>
+
+    <spec-decision did="D18" round="2" from="Q18" topic="HTML page">
+      <p class="q">What can be changed on a card on the page?</p>
+      <spec-option chosen value="A" label="GTD outcome + fields prefilled with the AI proposal" recommended>A radio with the outcome (<a href="#D13">D13</a>), below it Estimate, priority, Reminder / Due Date, Project prefilled with the proposal and editable. A text note.</spec-option>
+      <spec-option value="B" label="GTD outcome only">The AI sets the fields, corrections only through the note. Faster, less control.</spec-option>
+      <spec-option value="C" label="Accept / reject the proposal">Fastest, but every correction goes through the note.</spec-option>
+      <p class="why">The proposal makes approval one click, and editable fields allow corrections without writing notes.</p>
+    </spec-decision>
+
+    <spec-decision did="D19" round="2" from="Q19" topic="HTML page">
+      <p class="q">Who renders the page?</p>
+      <spec-option chosen value="A" label="CLI with a fixed template" recommended>The skill writes a JSON with the cards and proposals, a new command <code>worklog render-inbox</code> produces the HTML (like <code>render-plan</code>). Content from Slack and email is escaped, the look is always the same.</spec-option>
+      <spec-option value="B" label="The model writes HTML every time">No new code, but a risk of injecting source content and an inconsistent look.</spec-option>
+      <p class="why">Escaping untrusted source content and a stable form need a fixed template, the same pattern as <code>render-plan</code>.</p>
+    </spec-decision>
+
+    <spec-decision did="D20" round="2" from="Q20" topic="HTML page">
+      <p class="q">Apply the pasted answers immediately?</p>
+      <spec-option chosen value="A" label="Yes, the form is the consent" recommended>After pasting, the agent changes the cards and shows a short summary. Cards without an answer stay in the Inbox.</spec-option>
+      <spec-option value="B" label="A summary to confirm first">An extra safeguard, but the same thing a second time.</spec-option>
+      <p class="why">Filling in the form is an explicit approval, so the consent rule for Notion changes is met.</p>
+    </spec-decision>
+
+    <spec-decision did="D21" round="2" from="Q21" topic="HTML page">
+      <p class="q">What about cards that do not follow the Notion rules?</p>
+      <spec-option chosen value="A" label="A rename proposal in the form" recommended>The AI proposes a better title as an editable field, applied together with the outcome.</spec-option>
+      <spec-option value="B" label="Leave titles alone">Processing only changes fields, the title stays.</spec-option>
+      <p class="why">Manual cards often have vague titles; a proposed action title is approved in the same click.</p>
+    </spec-decision>
+
+    <spec-decision did="D22" round="2" from="Q22" topic="Registry">
+      <p class="q">How long to keep the local registry of captured items?</p>
+      <spec-option chosen value="A" label="30 days, then prune" recommended>Older items drop out through the cursor from <a href="#D4">D4</a> anyway, and the file does not grow.</spec-option>
+      <spec-option value="B" label="Forever">Full history in the Worklog git, the file grows.</spec-option>
+      <p class="why">The cursor already excludes older items, so 30 days is enough as a fast filter (<a href="#D6">D6</a>).</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-22-inbox-capture-and-processing.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>

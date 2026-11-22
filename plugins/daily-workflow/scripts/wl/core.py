@@ -238,7 +238,7 @@ def git(cwd: str | Path, *args: str, timeout: float = 5.0) -> str | None:
 def ensure_home() -> Path:
     """Create the Worklog directory, its git repo and config.toml on first use."""
     root = home()
-    for sub in ("checkpoints", "state/sessions", "state/cursors", "entries", "days", "plans", "meetings", "locks", "logs"):
+    for sub in ("checkpoints", "state/sessions", "state/cursors", "entries", "days", "plans", "inbox", "meetings", "locks", "logs"):
         (root / sub).mkdir(parents=True, exist_ok=True)
     gitignore = root / ".gitignore"
     if not gitignore.exists():
