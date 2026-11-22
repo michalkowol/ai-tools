@@ -19,11 +19,11 @@ This skill only plans. It never implements in the same turn. The implementation 
 - Project components: `.agents/docs/specs/assets/local-components.js`.
 - Template: `template.html` in this skill directory. Start every spec from it.
 
-This skill was installed into the project by `/mk:html-spec-init` from [michalkowol/ai-tools](https://github.com/michalkowol/ai-tools). The project structure (`.agents/docs/specs/`, `.agents/docs/specs/assets/` with `style.css`, `global-components.js` and `local-components.js`, `.agents/docs/INDEX.md`) is created by the init. If any of it is missing, stop and ask the user to run `/mk:html-spec-init` instead of creating it here. The plugin is public:
+This skill was installed into the project by `/html-spec:init` from [michalkowol/ai-tools](https://github.com/michalkowol/ai-tools). The project structure (`.agents/docs/specs/`, `.agents/docs/specs/assets/` with `style.css`, `global-components.js` and `local-components.js`, `.agents/docs/INDEX.md`) is created by the init. If any of it is missing, stop and ask the user to run `/html-spec:init` instead of creating it here. The plugin is public:
 
 ```
 /plugin marketplace add michalkowol/ai-tools
-/plugin install mk@michalkowol
+/plugin install html-spec@michalkowol
 ```
 
 Do not edit this skill in the project, change it in ai-tools and re-run the init.

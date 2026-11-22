@@ -7,6 +7,7 @@ Personal slash commands, skills and hooks for Claude Code, packaged as a plugin 
 ```bash
 /plugin marketplace add michalkowol/ai-tools   # or a local path to this checkout
 /plugin install mk@michalkowol
+/plugin install html-spec@michalkowol       # HTML specs, see below
 /plugin install daily-workflow@michalkowol   # optional, see plugins/daily-workflow/README.md
 ```
 
@@ -19,6 +20,7 @@ Push the changes first, the marketplace is fetched from GitHub (not needed when 
 ```bash
 /plugin marketplace update michalkowol
 /plugin update mk@michalkowol
+/plugin update html-spec@michalkowol
 /plugin update daily-workflow@michalkowol
 ```
 
@@ -28,11 +30,11 @@ Restart Claude Code (or run `/reload-plugins`) afterwards. Bump `version` in the
 
 Plugin commands are namespaced, e.g. `/mk:commit`.
 
-### HTML specs
+## Plugin `html-spec`
 
-`/mk:html-spec-init` sets up a project for planning in HTML files. It copies the `html-spec` and `html-spec-extract` skills into the project's `.claude/skills/`, so every engineer can use them without this plugin, and creates `.agents/docs/specs/` with `.agents/docs/INDEX.md`.
+`/html-spec:init` sets up a project for planning in HTML files. It copies the `html-spec` and `html-spec-extract` skills into the project's `.claude/skills/`, so every engineer can use them without this plugin, and creates `.agents/docs/specs/` with `.agents/docs/INDEX.md`.
 
-The init also copies the global `style.css` and `global-components.js` to `.agents/docs/specs/assets/`, so specs open from the repo without a server or internet access. Re-running the init upgrades the skills and the assets and migrates existing specs to the current spec format (see `plugins/mk/skills/html-spec-init/MIGRATIONS.md`).
+The init also copies the global `style.css` and `global-components.js` to `.agents/docs/specs/assets/`, so specs open from the repo without a server or internet access. Re-running the init upgrades the skills and the assets and migrates existing specs to the current spec format (see `plugins/html-spec/skills/init/MIGRATIONS.md`).
 
 ## Plugin `daily-workflow`
 

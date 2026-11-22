@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Move html-spec-init out of mk into a separate plugin</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-22" status="implemented">
+    <h1>Move html-spec-init out of mk into a separate plugin</h1>
+    <p>Whether to move the <code>html-spec-init</code> skill from the personal <code>mk</code> plugin into its own marketplace plugin, so teams can install only the spec tooling.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p><code>html-spec-init</code> is the only skill in <code>mk</code> meant for teams: it copies the <code>html-spec</code> and <code>html-spec-extract</code> skills and the assets into a project, and those skills tell others to install <code>mk</code>. The rest of <code>mk</code> is personal commands, working-style skills and a hook that blocks risky commands. This is the same split that made <code>daily-workflow</code> a separate plugin.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <h3>Current state</h3>
+    <ul>
+      <li><code>mk</code> has 9 commands, 10 skills and a <code>PreToolUse</code> hook for Bash (<code>guard.sh</code>) that blocks or asks to confirm risky commands. <cite><code>plugins/mk/commands</code>, <code>plugins/mk/skills</code>, <code>plugins/mk/hooks/hooks.json</code></cite></li>
+      <li>The <code>html-spec</code> skill copied into projects tells people to install <code>mk@michalkowol</code> and run <code>/mk:html-spec-init</code>. <cite><code>templates/html-spec/SKILL.md</code> lines 22-26</cite></li>
+      <li><code>/mk:html-spec-init</code> appears in 6 places: the templates of both skills, the headers of <code>style.css</code> and <code>global-components.js</code>, <code>MIGRATIONS.md</code>; plus the repo README. <cite><code>grep -rn mk: plugins/mk/skills/html-spec-init</code>, <code>README.md</code></cite></li>
+      <li>9 of 21 commits in the repo are about html-spec and usually bump the <code>mk</code> version (now 1.6.8). <cite><code>git log --oneline</code>, <code>plugins/mk/.claude-plugin/plugin.json</code></cite></li>
+    </ul>
+    <h3>Effects of the move</h3>
+    <ul>
+      <li>Re-running the init overwrites the skills and assets in a project, so the old references to <code>mk</code> go away on their own. The spec format does not change, no spec migration is needed. <cite><code>html-spec-init/SKILL.md</code>, <code>MIGRATIONS.md</code></cite></li>
+      <li>The note appended to <code>CLAUDE.md</code> / <code>AGENTS.md</code> does not mention <code>mk</code>. <cite><code>AGENTS.md</code></cite></li>
+      <li>This project already has the skills installed with the old reference. <cite><code>.claude/skills/html-spec/SKILL.md</code> line 22</cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Changes to the spec format, the components and the style.</li>
+      <li>Shipping <code>html-spec</code> as a plugin skill instead of copying it into the project.</li>
+      <li>The other skills and commands of <code>mk</code>.</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Plugin">
+      <p class="q">Move html-spec-init into a separate plugin?</p>
+      <spec-option value="A" label="Yes, a separate plugin" recommended chosen>Others install only the spec tooling, without the guard hook and the personal commands from mk. Spec changes do not bump the mk version.</spec-option>
+      <spec-option value="B" label="No, it stays in mk">No work and one install for you, but every spec user gets all of mk.</spec-option>
+      <p class="why">The init is team tooling; installing it should not bring a personal hook and personal commands into other people's sessions.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Plugin">
+      <p class="q">What is the new plugin called?</p>
+      <spec-option value="A" label="html-spec" recommended chosen>The same name as the project skill and the spec format. Command <code>/html-spec:init</code>.</spec-option>
+      <spec-option value="B" label="specs">Shorter, but generic and does not say it is about HTML.</spec-option>
+      <spec-option value="C" label="html-spec-tools">Tells the plugin apart from the <code>html-spec</code> project skill, but the command gets long.</spec-option>
+      <p class="why">One name for the plugin, the project skill and the format; the plugin prefix keeps the commands apart.</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Plugin">
+      <p class="q">What is the init skill called in the new plugin?</p>
+      <spec-option value="A" label="init" recommended chosen>The plugin prefix already says it is about specs, e.g. <code>/html-spec:init</code>.</spec-option>
+      <spec-option value="B" label="html-spec-init">No rename, but the command repeats the name: <code>/html-spec:html-spec-init</code>.</spec-option>
+      <p class="why">Avoids repeating the plugin name in the command.</p>
+    </spec-decision>
+
+    <spec-decision did="D4" round="1" from="Q4" topic="Migration">
+      <p class="q">What stays in mk after the move?</p>
+      <spec-option value="A" label="Nothing, the skill is removed from mk" recommended chosen>Clean. Whoever runs the old command will not find it and installs the new plugin from the README.</spec-option>
+      <spec-option value="B" label="A stub for a few versions">A small <code>html-spec-init</code> skill in mk that only says how to install the new plugin. Gentler, but has to be remembered and removed later.</spec-option>
+      <p class="why">Few users so far, and the README points to the new plugin; a stub would only be code to delete later.</p>
+    </spec-decision>
+
+    <spec-decision did="D5" round="1" from="Q5" topic="Migration">
+      <p class="q">Which version does the new plugin start from?</p>
+      <spec-option value="A" label="1.0.0" recommended chosen>New plugin, new numbering. The spec format has its own number (<code>html-spec format</code>), so nothing is lost.</spec-option>
+      <spec-option value="B" label="Continue the mk version">Continuity with history, but a number unrelated to the new plugin.</spec-option>
+      <p class="why">The plugin version and the spec format are independent; a new plugin starts its own numbering.</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-22-html-spec-separate-plugin.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>

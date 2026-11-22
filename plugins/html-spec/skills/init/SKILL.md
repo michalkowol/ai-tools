@@ -1,5 +1,5 @@
 ---
-name: html-spec-init
+name: init
 description: Use when setting up a project for HTML specs, or when the user asks to install, update or upgrade the html-spec skills in a repo - installs the html-spec and html-spec-extract skills into .claude/skills/ so every engineer on the project can use them, copies style.css and global-components.js, creates .agents/docs/specs, .agents/docs/specs/assets, .agents/docs/INDEX.md, local-components.js and a note in CLAUDE.md / AGENTS.md, and on re-run upgrades them and migrates existing specs to the current format
 ---
 

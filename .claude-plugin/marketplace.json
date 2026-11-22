@@ -14,6 +14,12 @@
       "category": "productivity"
     },
     {
+      "name": "html-spec",
+      "description": "Sets up a project for planning in HTML specs: skills, shared style and components, docs index",
+      "source": "./plugins/html-spec",
+      "category": "productivity"
+    },
+    {
       "name": "daily-workflow",
       "description": "Work Logger hooks that log work from parallel sessions into a local Worklog, and a Daily Briefing built from it",
       "source": "./plugins/daily-workflow",
