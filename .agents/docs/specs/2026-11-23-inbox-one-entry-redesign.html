@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Inbox: one entry at a time, built from Web Components</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-23" status="implemented">
+    <h1>Inbox: one entry at a time, built from Web Components</h1>
+    <p>A new Inbox processing page in <code>daily-workflow</code>: one entry at a time, the AI proposal accepted by default, an entry can be split into several cards, Gmail-like shortcuts. The page is built from custom elements in the style of the <code>html-spec</code> plugin.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>The first version of the Inbox processing page (<a href="2026-11-22-inbox-capture-and-processing.html">previous spec</a>, D11, D18) is one long form with all cards at once. With 27 entries it is too slow. The user designed a prototype with the agent: one entry at a time, the AI proposal accepted by default, only what is wrong gets corrected, and an entry can become several cards. This spec brings the prototype into the plugin and settles how to build the page from Web Components so that a review of the page is about content, not formatting.</p>
+    <p>The behaviour, look, shortcuts, proposal rules and apply rules are already decided in the brief (<code>plan/PROMPT.md</code>, summarized in Facts). Implement them as written there, except where a decision below says otherwise.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <h3>Brief and prototype</h3>
+    <ul>
+      <li>The brief decides: accept-by-default flow, a summary with the apply prompt at the end, and an entry stays in the Inbox only when all its cards are Keep. <cite><code>plan/PROMPT.md</code> §1</cite></li>
+      <li>An entry can hold several cards: the first updates the original page, the others are created; the AI proposes a split itself; <code>+ Add card</code>, <code>×</code>, tags <code>added by you</code> and <code>edited by you</code>. <cite><code>plan/PROMPT.md</code> §2-3</cite></li>
+      <li>Fields are pill dropdowns in the order status, type, estimate, priority, reminder, due; the set of fields depends on the status; the project is only a read-only pill, changed through the note. <cite><code>plan/PROMPT.md</code> §4</cite></li>
+      <li>One note for AI per entry, low-key; shortcuts <code>j/k ←/→ e # + n z ? Esc</code>, a toast with Undo, state in <code>localStorage</code>. <cite><code>plan/PROMPT.md</code> §5-6</cite></li>
+      <li>Claude style, English UI labels, a colour-only progress bar, animation only when the entry changes. <cite><code>plan/PROMPT.md</code> §7</cite></li>
+      <li>The proposal always has an action title (~60 characters, PR reference in parentheses), the title language follows the entry (hand-added Polish entries stay Polish), and a split when the entry holds several independent actions. <cite><code>plan/PROMPT.md</code> §8, user memory</cite></li>
+      <li>Apply: one line per entry with at least one non-Keep card, <code>{"id","cards":[…],"note"}</code> for a split; when the title changes, append <code>Original title: …</code> to the body; existing body content always stays, only append. <cite><code>plan/PROMPT.md</code> §9, user memory</cite></li>
+      <li>The prototype: 3 hard-coded entries, one HTML file with inline CSS and JS, no Notion. <cite><code>plan/prototype-one-card.html</code></cite></li>
+      <li>The prototype and the brief's examples contain real organisation, repo, people, ticket and project names. <code>plan/</code> is not in git. <cite><code>git status</code>, <code>plan/prototype-one-card.html</code></cite></li>
+    </ul>
+    <h3>Plugin</h3>
+    <ul>
+      <li>The current page: <code>scripts/wl/inbox.py</code> renders a form with all cards, CSS and JS as Python strings, and a card schema with one <code>proposal</code>. <cite><code>scripts/wl/inbox.py</code></cite></li>
+      <li>A file in the old format with 27 entries exists. <cite><code>~/.ai/worklog/inbox/2026-11-22-1535.json</code></cite></li>
+      <li><code>~/.ai/worklog</code> is a volume with the same path on the host; the page is opened on the host with <code>open</code>. The plugin directory (<code>~/.claude/plugins/cache/…</code>) is not described as mounted. <cite><code>skills/worklog/SKILL.md</code>, README</cite></li>
+      <li>The container has <code>node</code> v26; the repo has no npm dependencies. <cite><code>node --version</code></cite></li>
+      <li>An earlier decision for this plugin: examples in code, skills and tests are fictional and neutral. <cite><code>2026-11-22-daily-workflow-plugin-cleanup.html</code> D3</cite></li>
+    </ul>
+    <h3>html-spec</h3>
+    <ul>
+      <li>The components are light DOM custom elements without Shadow DOM, styled by one <code>style.css</code>; spec content is declarative markup (<code>&lt;spec-question&gt;</code>, <code>&lt;spec-option&gt;</code>), state in <code>localStorage</code>. <cite><code>plugins/html-spec/skills/init/assets/global-components.js</code> header</cite></li>
+      <li>The assets live in the plugin and are copied next to the pages, which link them with relative paths and declare their format with <code>&lt;meta name="html-spec"&gt;</code>; loaded with <code>&lt;script defer&gt;</code>, not as a module. <cite><code>plugins/html-spec/skills/init/SKILL.md</code>, <code>template.html</code></cite></li>
+      <li>Chrome blocks ES modules from <code>file://</code> (CORS); a plain <code>&lt;script defer src&gt;</code> works. <cite>browser behaviour</cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Capture: the sources and capture-time titles stay (<code>plan/PROMPT.md</code> §8).</li>
+      <li>The briefing plan page (<code>plan.py</code>).</li>
+      <li>Dark mode.</li>
+      <li>Reading the old page JSON format (<a href="#D7">D7</a>).</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Components">
+      <p class="q">In what form does the per-run HTML carry the content?</p>
+      <spec-option chosen value="A" label="Declarative markup like html-spec" recommended>E.g. <code>&lt;inbox-entry entry-id age waiting&gt;&lt;inbox-card outcome="next" estimate="1 x 🍅" …&gt;Title&lt;/inbox-card&gt;&lt;/inbox-entry&gt;</code>. Reviewing the per-run HTML means reading content; the renderer escapes every value with <code>html.escape</code>. The JSON file in <code>inbox/</code> stays the source of truth for apply.</spec-option>
+      <spec-option value="B" label="JSON in a script + empty tags">As in the brief. One data path, but reviewing the per-run HTML means reviewing JSON, not the page.</spec-option>
+      <spec-option value="C" label="Markup + the same JSON in a script">The components read the markup, the JSON is only for the prompt. Two sources of the same content on the page.</spec-option>
+      <p class="why">The same pattern as html-spec: the generated page reads as content. This replaces the brief's §10 point "page JSON in a <code>&lt;script type="application/json"&gt;</code>"; the other §10 guarantees (escaping, http(s) links only, ordering in the renderer) stay.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Components">
+      <p class="q">How does the page get its CSS and components?</p>
+      <spec-option chosen value="A" label="Copy to inbox/assets/ on every render" recommended><code>render-inbox</code> overwrites <code>~/.ai/worklog/inbox/assets/inbox.css</code> and <code>inbox-components.js</code> with the plugin's version, and the page links them relatively (like <code>.agents/docs/specs/assets/</code>). The per-run HTML stays small; old pages also get the new components, so the page declares its format version in a <code>&lt;meta&gt;</code>.</spec-option>
+      <spec-option value="B" label="Inlined into every HTML">A self-contained file frozen at its version, but large, and the review mixes formatting with content.</spec-option>
+      <spec-option value="C" label="Link straight into the plugin directory">No copying, but the plugin path exists only in the container; on the host the page does not load.</spec-option>
+      <p class="why">The only option that keeps the per-run HTML small and works from <code>file://</code> on the host.</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Components">
+      <p class="q">Light DOM or Shadow DOM?</p>
+      <spec-option chosen value="A" label="Light DOM + one inbox.css" recommended>Like <code>html-spec</code>: the components render plain markup with classes, the whole look is in one CSS file, easy to review and to test in a browser.</spec-option>
+      <spec-option value="B" label="Shadow DOM, styles inside the components">Full isolation ("own styles" in the brief), but the CSS is spread over JS classes and tokens have to be passed as custom properties.</spec-option>
+      <p class="why">Consistent with html-spec, and one stylesheet keeps the look reviewable in one place.</p>
+    </spec-decision>
+
+    <spec-decision did="D4" round="1" from="Q4" topic="Tests">
+      <p class="q">How to test the page logic?</p>
+      <spec-option chosen value="A" label="Pure logic in a separate file + node --test" recommended>The apply line, fields per status, date options and the Keep rule in a file without DOM, exposed on <code>globalThis</code>. A <code>node --test</code> test loads it through <code>vm</code>; the Python unittest runs it and skips when <code>node</code> is missing. Plus renderer tests in Python.</spec-option>
+      <spec-option value="B" label="Python only + manual browser test">No new tool, but the apply-line format (generated in JS) has no automated test.</spec-option>
+      <spec-option value="C" label="Playwright in the tests">Tests real keys and DOM, but a heavy dependency the repo does not have.</spec-option>
+      <p class="why">The apply line is the contract with the skill and must be tested; node is already in the container and needs no dependencies.</p>
+    </spec-decision>
+
+    <spec-decision did="D5" round="1" from="Q5" topic="Apply">
+      <p class="q">What does Keep on the first card of a split entry mean?</p>
+      <spec-option chosen value="A" label="The first card is always the original" recommended>Card 1 = Keep: the original stays in the Inbox, the other cards are created as new. The apply line keeps the position (<code>{"outcome":"keep"}</code> in place 1).</spec-option>
+      <spec-option value="B" label="The first non-Keep card takes over the original">Like the prototype. A simpler line, but the original's title and status are changed by a card other than the one shown first.</spec-option>
+      <p class="why">What the user sees as card 1 is what happens to the original page.</p>
+    </spec-decision>
+
+    <spec-decision did="D6" round="1" from="Q6" topic="Apply">
+      <p class="q">Agenda without a chosen person?</p>
+      <spec-option chosen value="A" label="Empty option “choose person”" recommended>Without a choice the card is incomplete: the summary marks it, and apply skips that card and reports it.</spec-option>
+      <spec-option value="B" label="First person in the list (like the prototype)">Always complete, but easy to add the topic to the wrong person.</spec-option>
+      <p class="why">A silent default puts topics on the wrong person's card.</p>
+    </spec-decision>
+
+    <spec-decision did="D7" round="1" from="Q7" topic="Compatibility">
+      <p class="q">Does the renderer read the old JSON format (one <code>proposal</code>)?</p>
+      <spec-option value="A" label="Yes, proposal = one card" recommended>A few lines of code; the existing file with 27 entries in <code>~/.ai/worklog/inbox/</code> opens in the new view.</spec-option>
+      <spec-option chosen value="B" label="No, only the new schema">Less code; the old file has to be generated again with <code>process</code>.</spec-option>
+      <p class="why">Less code; the old file is regenerated with <code>process</code>.</p>
+    </spec-decision>
+
+    <spec-decision did="D8" round="1" from="Q8" topic="Privacy">
+      <p class="q">What about the plan/ directory (brief and prototype)?</p>
+      <spec-option chosen value="A" label="Do not commit, delete after implementation" recommended>The spec describes the behaviour without private data; examples in <code>processing.md</code> and the tests are fictional (Alice, <code>org/shop#412</code>, <code>PROJ-1234</code>).</spec-option>
+      <spec-option value="B" label="Commit an anonymized prototype">The prototype stays as a reference in the repo, but it has to be cleaned and maintained next to the real page.</spec-option>
+      <spec-option value="C" label="Keep it locally, add to .gitignore">Nothing is lost, but an ignored directory for private files in a public repo.</spec-option>
+      <p class="why">The repo is public, and the brief's examples (§8, §5) name real people, repos, tickets and a project.</p>
+    </spec-decision>
+
+    <spec-decision did="D9" round="1" from="Q9" topic="Components">
+      <p class="q">Where do the style tokens (colours, fonts) come from?</p>
+      <spec-option chosen value="A" label="Own copy in inbox.css" recommended>The same values as in <code>html-spec</code>, copied. The plan page (<code>plan.py</code>) stays unchanged.</spec-option>
+      <spec-option value="B" label="A shared token file for the plan and the inbox">One source of colours in the plugin, but it needs a rework of the plan page, which is not part of this change.</spec-option>
+      <p class="why">Keeps the change inside the inbox page.</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-23-inbox-one-entry-redesign.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>

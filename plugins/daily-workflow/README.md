@@ -8,8 +8,8 @@ Personal Claude Code plugin with three parts that share one local Worklog:
 - **Daily Briefing**: `/daily-workflow:briefing` plans the day before the daily, `update` corrects it from the daily
   transcript and schedules the Deep Work block, `home` plans home tasks.
 - **Inbox**: `/daily-workflow:inbox` captures unanswered Slack messages, saved Slack items, PRs waiting for review,
-  own PRs that need action and important email into the Notion GTD Inbox, then renders the whole Inbox as one HTML
-  form for processing.
+  own PRs that need action and important email into the Notion GTD Inbox, then renders the whole Inbox as an HTML
+  page that shows one entry at a time with the AI proposal already chosen.
 
 ## Setup
 
@@ -41,9 +41,11 @@ The first hook creates `~/.ai/worklog` as a local git repo with `config.toml` fr
 Drop the daily transcript into `~/.ai/worklog/meetings/` with the date in the name, e.g. `2026-11-23-daily.txt`.
 Open the plan on the host with the printed command, e.g. `open ~/.ai/worklog/plans/2026-11-23.html`.
 
-The inbox page works the same way (`open ~/.ai/worklog/inbox/2026-11-23-0930.html`). Pick an outcome per card (the
-proposal is preselected), adjust the fields, press Copy and paste the prompt into the session. Answers survive a page
-reload. Capture creates new Inbox cards without asking. Every other Notion change comes from the pasted prompt.
+The inbox page works the same way (`open ~/.ai/worklog/inbox/2026-11-23-0930.html`). Each entry starts with the AI
+proposal; `j` / `→` accepts it and moves on, so only change what is wrong: click a field or the title, `e` Done,
+`#` Trash, `+` adds a card (an entry can become several cards), `n` a note for AI, `z` resets the entry, `?` help.
+After the last entry the summary holds the prompt to paste into the session. Progress survives a page reload.
+Capture creates new Inbox cards without asking. Every other Notion change comes from the pasted prompt.
 
 ## Worklog layout
 
@@ -56,6 +58,7 @@ reload. Capture creates new Inbox cards without asking. Every other Notion chang
   days/YYYY-MM-DD.md                      generated day view
   plans/YYYY-MM-DD[-home].json|html       briefing plans
   inbox/YYYY-MM-DD-HHMM.json|html          inbox processing pages
+  inbox/assets/                           page components, copied from the plugin on every render
   state/inbox.json                        inbox cursor and 30-day registry of captured URLs
   meetings/                               daily transcripts
   config.toml
@@ -82,3 +85,7 @@ Every file has a single writer, so parallel sessions in separate containers neve
 ```
 python3 -m unittest discover -s plugins/daily-workflow/tests
 ```
+
+The unittest run also runs `tests/inbox_logic.test.js` with `node --test` (skipped without `node`). The page
+components live in `scripts/wl/assets/`: `inbox-logic.js` (pure logic, no DOM), `inbox-components.js` and
+`inbox.css`.

@@ -48,6 +48,8 @@ One card per thread, PR or email.
 
 - Name: an action in English, verb first, with the person and the subject: "Reply to Alice about the API contract",
   "Review org/shop#412 batch processing", "Fix failing CI on Retry policy PR".
+- The processing proposes its own action title later (`processing.md`), so a capture title only has to be
+  recognisable.
 - Status `Inbox`, Category `Work`, URL = the source URL. No Estimate, tags, dates or project: that is processing.
 - Body, plain paragraphs:
   - source line: `Slack DM from Alice, 2026-11-23 10:42` / `#team-proj, thread by Bob` / `PR org/shop#412 by alice,

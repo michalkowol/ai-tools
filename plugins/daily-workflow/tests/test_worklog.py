@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -367,57 +368,113 @@ class InboxTest(WorklogTestCase):
         self.assertEqual(list(json.loads(inbox.state_path().read_text())["seen"]), ["https://x.test/new"])
 
     def test_order_blocking_then_due_then_oldest(self):
-        cards = [
-            {"id": "old", "created_at": "2026-11-20T10:00:00+01:00"},
-            {"id": "newer", "created_at": "2026-11-22T10:00:00+01:00"},
-            {"id": "due", "created_at": "2026-11-22T11:00:00+01:00", "proposal": {"due": "2026-11-25"}},
-            {"id": "blocking", "created_at": "2026-11-22T12:00:00+01:00", "waiting_on_me": True},
+        entries = [
+            {"id": "old", "created_at": "2026-11-20T10:00:00+01:00", "cards": [{}]},
+            {"id": "newer", "created_at": "2026-11-22T10:00:00+01:00", "cards": [{}]},
+            {"id": "due", "created_at": "2026-11-22T11:00:00+01:00", "cards": [{"due": "2026-11-25"}]},
+            {"id": "blocking", "created_at": "2026-11-22T12:00:00+01:00", "waiting_on_me": True, "cards": [{}]},
             {"title": "no id"},
         ]
-        self.assertEqual([c["id"] for c in inbox.order(cards)], ["blocking", "due", "old", "newer"])
+        self.assertEqual([x["id"] for x in inbox.order(entries)], ["blocking", "due", "old", "newer"])
 
-    def test_render_escapes_and_prefills_proposal(self):
-        core.ensure_home()
+    def page_data(self, **extra):
         data = {
             "date": "2026-11-23", "generated_at": "2026-11-23T09:31:04+01:00",
             "captured": {"created": 1, "skipped": 2},
-            "projects": ["Hiring"],
             "agenda_cards": [{"id": "a1", "name": "Alice"}],
-            "cards": [{
+            "entries": [{
                 "id": "p1", "url": "javascript:alert(1)", "title": "<img src=x onerror=alert(1)>",
-                "source": {"label": "Slack DM", "url": "https://team.slack.com/x"},
-                "quote": "</script><script>alert(2)</script>",
-                "waiting_on_me": True,
-                "proposal": {"outcome": "next", "title": "Reply to Alice", "category": ["Work"],
-                             "estimate": "0.5 x 🍅", "priority": "P1", "reminder": "2026-11-23", "project": "Hiring",
-                             "why": "Direct ask."},
+                "source": {"label": "PR org/shop#412 by alice", "url": "https://github.com/org/shop/pull/412"},
+                "age": "4 d", "created_at": "2026-11-19T10:00:00+01:00", "waiting_on_me": True,
+                "why": "</inbox-why><script>alert(2)</script>",
+                "cards": [{"outcome": "next", "title": "Review Alice's batch processing (shop#412)", "category": ["Work"],
+                           "estimate": "1 x 🍅", "priority": "P1", "reminder": "2026-11-23", "due": "", "project": "Hiring"}],
+            }, {
+                "id": "p2", "url": "https://www.notion.so/p2", "title": "Zmiany na stronie", "source": None, "age": "2 d",
+                "why": "Two independent changes.",
+                "cards": [
+                    {"outcome": "next", "title": "Dodać zdjęcie sali", "category": ["Home"], "estimate": "0.5 x 🍅"},
+                    {"outcome": "bogus", "title": "Dodać przerywniki", "category": ["Work", "Home"]},
+                ],
             }],
             "missing_sources": [{"source": "Gmail", "reason": "not signed in"}],
         }
-        path = inbox.inbox_dir() / "2026-11-23-0931.json"
+        data.update(extra)
+        return data
+
+    def render_page(self, data, name="2026-11-23-0931.json"):
+        core.ensure_home()
+        path = inbox.inbox_dir() / name
         path.write_text(json.dumps(data))
-        out = self.run_cli("render-inbox", "inbox/2026-11-23-0931.json")
+        out = self.run_cli("render-inbox", f"inbox/{name}")
+        return out, path.with_suffix(".html")
+
+    def test_render_single_and_split_entries_as_markup(self):
+        out, html_path = self.render_page(self.page_data())
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertIn("2026-11-23-0931.html", out.stdout)
-        page = path.with_suffix(".html").read_text()
+        page = html_path.read_text()
+        self.assertIn('<meta name="daily-workflow-inbox" content="1">', page)
+        self.assertIn('<inbox-app file="inbox/2026-11-23-0931.json" date="2026-11-23"', page)
+        self.assertIn('captured="1" skipped="2"', page)
+        self.assertIn('<inbox-agenda name="Alice"></inbox-agenda>', page)
+        self.assertIn('<inbox-missing source="Gmail">not signed in</inbox-missing>', page)
+        self.assertIn('<inbox-entry entry-id="p1" age="4 d" waiting>', page)
+        self.assertIn('<inbox-original href="https://github.com/org/shop/pull/412" label="PR org/shop#412 by alice">', page)
+        self.assertIn('<inbox-card outcome="next" category="Work" estimate="1 x 🍅" priority="P1" reminder="2026-11-23" '
+                      'project="Hiring">Review Alice&#x27;s batch processing (shop#412)</inbox-card>', page)
+        self.assertIn('<inbox-entry entry-id="p2" age="2 d" page-url="https://www.notion.so/p2">', page)
+        self.assertIn('<inbox-original>Zmiany na stronie</inbox-original>', page)
+        self.assertIn('<inbox-card outcome="next" category="Home" estimate="0.5 x 🍅">Dodać zdjęcie sali</inbox-card>', page)
+        self.assertIn('<inbox-card outcome="keep" category="Work+Home">Dodać przerywniki</inbox-card>', page)
+        self.assertLess(page.index('entry-id="p1"'), page.index('entry-id="p2"'))
+        for name in inbox.ASSETS:
+            self.assertEqual((inbox.inbox_dir() / "assets" / name).read_bytes(), (inbox.ASSETS_DIR / name).read_bytes())
+            self.assertIn(f'assets/{name}', page)
+        self.assertNotIn("<style", page)
+
+    def test_render_escapes_content_and_drops_unsafe_links(self):
+        _, html_path = self.render_page(self.page_data())
+        page = html_path.read_text()
         self.assertNotIn("<img src=x", page)
-        self.assertNotIn("alert(2)</script>", page)
+        self.assertIn("&lt;img src=x onerror=alert(1)&gt;", page)
+        self.assertNotIn("<script>alert", page)
+        self.assertNotIn("</inbox-why><script>", page)
         self.assertNotIn("javascript:", page)
-        self.assertIn('href="https://team.slack.com/x"', page)
-        self.assertIn('data-file="inbox/2026-11-23-0931.json"', page)
-        self.assertIn('value="next" checked', page)
-        self.assertIn('<option value="0.5 x 🍅" selected>', page)
-        self.assertIn('<option value="Hiring" selected>', page)
-        self.assertIn('value="Reply to Alice"', page)
-        self.assertIn("someone is waiting", page)
-        self.assertIn("Missing sources", page)
+
+    def test_render_overwrites_stale_assets(self):
+        stale = inbox.inbox_dir() / "assets" / "inbox.css"
+        stale.parent.mkdir(parents=True, exist_ok=True)
+        stale.write_text("old")
+        self.render_page(self.page_data())
+        self.assertEqual(stale.read_bytes(), (inbox.ASSETS_DIR / "inbox.css").read_bytes())
+
+    def test_render_rejects_old_format_and_entries_without_cards(self):
+        out, _ = self.render_page({"date": "2026-11-23", "cards": [{"id": "p1", "proposal": {}}]})
+        self.assertEqual(out.returncode, 1)
+        self.assertIn("old page JSON format", out.stderr)
+        out, _ = self.render_page({"date": "2026-11-23", "entries": [{"id": "p1", "title": "x"}]})
+        self.assertEqual(out.returncode, 1)
+        self.assertIn("has no cards", out.stderr)
 
     def test_render_empty_inbox(self):
         core.ensure_home()
         path = inbox.inbox_dir() / "2026-11-23-1000.json"
-        path.write_text(json.dumps({"date": "2026-11-23", "cards": []}))
+        path.write_text(json.dumps({"date": "2026-11-23", "entries": []}))
         page = inbox.render_file(path, "inbox/2026-11-23-1000.json").read_text()
-        self.assertIn("Inbox zero.", page)
+        self.assertIn('<inbox-app file="inbox/2026-11-23-1000.json" date="2026-11-23">\n</inbox-app>', page)
+
+
+class InboxLogicTest(unittest.TestCase):
+    """Runs the node tests of the page logic (assets/inbox-logic.js); skipped without node."""
+
+    def test_node_logic_tests(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node is not installed")
+        test_file = Path(__file__).resolve().parent / "inbox_logic.test.js"
+        out = subprocess.run([node, "--test", str(test_file)], capture_output=True, text=True, check=False)
+        self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
 
 
 if __name__ == "__main__":

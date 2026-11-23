@@ -192,7 +192,11 @@ def cmd_render_inbox(args) -> int:
         label = str(path.relative_to(core.home().resolve()))
     except ValueError:
         label = str(path)
-    html_path = inbox.render_file(path, label)
+    try:
+        html_path = inbox.render_file(path, label)
+    except ValueError as exc:
+        print(f"[render-inbox] {exc}", file=sys.stderr)
+        return 1
     print(f"open {host_path(html_path)}")
     return 0
 

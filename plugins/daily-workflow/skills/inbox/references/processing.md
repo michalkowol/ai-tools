@@ -1,40 +1,33 @@
-# Processing: page JSON and applying answers
+# Processing: page JSON, proposal and apply
 
 ## Page JSON (`~/.ai/worklog/inbox/YYYY-MM-DD-HHMM.json`)
 
-`worklog render-inbox <file>` renders it into a fixed page next to it. All text is plain text, the renderer escapes
-it and keeps only `http(s)` links. The renderer orders the cards, so their order in the file does not matter.
+The JSON is the source of truth for apply. `worklog render-inbox <file>` turns it into declarative markup next to it
+(`<inbox-app>`, `<inbox-entry>`, `<inbox-card>`) and copies the components from the plugin into `inbox/assets/`. All
+text is plain text: the renderer escapes it and keeps only `http(s)` links. The renderer orders the entries, so their
+order in the file does not matter.
 
 ```json
 {
-  "v": 1,
+  "v": 2,
   "date": "2026-11-23",
   "generated_at": "2026-11-23T09:31:04+01:00",
   "captured": {"created": 7, "skipped": 3},
-  "projects": ["Platform migration", "Hiring"],
   "agenda_cards": [{"id": "notion-page-id", "name": "Alice"}],
-  "cards": [
+  "entries": [
     {
       "id": "notion-page-id",
       "url": "https://www.notion.so/…",
-      "title": "Reply to Alice about the API contract",
-      "source": {"label": "Slack DM from Alice", "url": "https://….slack.com/archives/…"},
-      "quote": "Can you confirm the contract by Wednesday?",
-      "age": "2 h",
-      "created_at": "2026-11-23T07:12:00+01:00",
+      "title": "Review org/shop#412 PROJ-1234: Batch processing for events",
+      "source": {"label": "PR org/shop#412 by alice", "url": "https://github.com/org/shop/pull/412"},
+      "age": "4 d",
+      "created_at": "2026-11-19T10:00:00+01:00",
       "waiting_on_me": true,
-      "proposal": {
-        "outcome": "next",
-        "title": "Confirm the API contract with Alice",
-        "category": ["Work"],
-        "estimate": "0.5 x 🍅",
-        "priority": "P1",
-        "reminder": "2026-11-23",
-        "due": "2026-11-25",
-        "project": "",
-        "agenda": "",
-        "why": "Direct ask with a Wednesday deadline."
-      },
+      "why": "Review required and nobody approved yet; Alice waits 4 days.",
+      "cards": [
+        {"outcome": "next", "title": "Review Alice's batch processing (shop#412)", "category": ["Work"],
+         "estimate": "1 x 🍅", "priority": "P1", "reminder": "2026-11-23", "due": "", "project": "", "agenda": ""}
+      ],
       "result": ""
     }
   ],
@@ -42,10 +35,14 @@ it and keeps only `http(s)` links. The renderer orders the cards, so their order
 }
 ```
 
+- `title`: the current Notion title, shown as "Original: …". `url`: the Notion page. `source`: from the URL field and
+  the card body; `null` for entries added by hand.
+- `cards`: the proposal, at least one. Card 1 is always the original page, the others become new cards.
 - `waiting_on_me`: someone is blocked on the user (a direct question, a review request, a requested change). These
-  cards go first, then cards with a due date, then the rest oldest first (`created_at`).
-- `source` and `quote`: from the card body; for cards added by hand, the URL field if any, otherwise omit.
-- `result`: empty until `apply`, then e.g. `applied: Next Actions`, `failed: <reason>`, `delete by hand`.
+  entries go first, then entries whose first card has a due date, then the rest oldest first (`created_at`).
+- `why`: one line for the whole entry; for a split it says why.
+- `result`: empty until `apply`, then e.g. `applied: Next Actions + 1 created`, `failed: <reason>`.
+- The old format (top-level `cards` with one `proposal` each) is rejected; run `process` again.
 
 ## Proposal rules
 
@@ -54,34 +51,65 @@ it and keeps only `http(s)` links. The renderer orders the cards, so their order
 | `done` | takes under two minutes and the user can do it right now (a short reply, an approval) | Status `Done (today)` |
 | `next` | the user has to do it | Status `Next Actions`, Reminder on the planned day |
 | `waiting` | the next step is someone else's | Status `Waiting for`, Reminder = the follow-up day |
-| `agenda` | a topic to raise with one person who has an Agenda card | append to that card, archive this one |
+| `agenda` | a topic to raise with one person who has an Agenda card | append to that card, trash this one |
 | `someday` | maybe later, no commitment | Status `Someday/Maybe` |
 | `icebox` | parked, keep for reference | Status `Icebox` |
-| `trash` | no action and nothing to keep (FYI, already handled, noise) | archive the page |
+| `trash` | no action and nothing to keep (FYI, already handled, noise) | move the page to Trash |
 | `keep` | not enough information to decide | no change, stays in the Inbox |
 
+- Title: always propose an action title, not only when the current one is vague: verb first, what and for whom,
+  about 60 characters, the PR reference in parentheses, e.g. `Review Alice's batch processing (shop#412)`,
+  `Approve vitest security bump (web#175)`.
+- Title language follows the entry: captured entries in English; entries the user added by hand in another language
+  keep it (e.g. a Polish card gets a Polish action title).
+- Split: when the title or body holds several independent actions, one card per action. Card 1 is the main action.
 - Estimate and priority as in `gtd-rules.md`: light ≤ 1 x 🍅, heavy ≥ 2 x 🍅, `None` for work tracked in Jira and for
   Agenda; one of P1, P2, P3. Reviews are usually light, P1 when the author is blocked.
-- Reminder: today for blocking items, otherwise the day it makes sense; never in the past. Due Date only for a real
+- Reminder: today for blocking items, otherwise the day it makes sense, never in the past. Due Date only for a real
   deadline stated in the source.
-- Category: `Work` for captured cards; for cards added by hand judge from the content (`Home`, or both).
-- Project only from `projects`, empty when nothing fits.
-- Title: propose an action title (verb first) when the current one is vague, a bare link, or holds two actions;
-  otherwise repeat the current title.
+- Category: `Work` for captured entries; for entries added by hand judge from the content (`Home`, or both).
+- Project only from existing options, empty when nothing fits. The page shows it read-only; the user changes it
+  through the note.
+- Agenda: `agenda` is the exact name of an Agenda card from `agenda_cards`, or empty when unsure.
+
+## Fields per status
+
+The page shows, and the apply line carries, only these fields (plus `title`, except for Trash and Keep):
+
+| Status | Fields |
+|---|---|
+| `done` | category, estimate, priority, reminder, due |
+| `next` | category, estimate, priority, reminder, due, project |
+| `waiting` | category, priority, reminder, due, project |
+| `agenda` | agenda |
+| `someday`, `icebox` | category, reminder, due, project |
+| `trash`, `keep` | none |
 
 ## Apply
 
-Each pasted line is `{"id": …, "outcome": …, <shown fields>, "note": …}`. Only the fields the page shows for the
-outcome are present. Look up the card by `id` in the page JSON, ignore unknown ids.
+The prompt from the page: `/daily-workflow:inbox apply <file>`, then one line per entry with at least one non-Keep
+card. Look up the entry by `id` in the page JSON, ignore unknown ids.
 
-- `done`, `next`, `waiting`, `someday`, `icebox`: `notion-update-page` on the card: Name = `title` if it changed,
-  Status per the table above, Category, Estimate, Tags = the priority plus the card's existing ♻️ Recurring tag if it
-  has one, Reminder, Due Date, Project. Empty fields are cleared only for Reminder and Due Date when the outcome sets
-  them; other empty fields are left as they are.
-- `agenda`: append one bullet to the body of the Agenda card named in `agenda`: the card title, the note if any, and
-  the link to the source (or the card). Then archive the Inbox card.
-- `trash`: move the page to trash with the Notion tool that supports it. If no tool can archive or trash a page, set
-  Status `Done` and report it as "delete by hand".
-- `note`: the user's correction or context. Apply it on top of the fields (e.g. "ask Bob instead" → adjust the title).
-  If the note contradicts the outcome, apply nothing for that card and report it.
-- After every line, set the card's `result` in the page JSON, then re-render once at the end.
+```json
+{"id": "<page id>", "outcome": "next", "title": "…", "category": ["Work"], "estimate": "1 x 🍅", "priority": "P1", "reminder": "2026-11-23", "due": "", "project": "", "note": ""}
+{"id": "<page id>", "cards": [{"outcome": "keep"}, {"outcome": "next", "title": "…", "category": ["Home"], "…": "…"}], "note": "shared note"}
+```
+
+- Single card: apply it to the original page. Split (`cards`): card 1 applies to the original page, every other card
+  is created with `notion-create-pages` in the data source: Name, Status per the table above, the fields of the line,
+  Category, the URL copied from the original, and a body with a link back to the original card. A card
+  `{"outcome": "keep"}` changes nothing: in place 1 the original stays in the Inbox, elsewhere no card is created.
+- Properties (`notion-update-page`, `update_properties`): Name = `title`, Status, Category, Estimate,
+  Tags = the priority plus the card's existing ♻️ Recurring tag if it has one, Reminder, Due Date, Project. Empty
+  `reminder` / `due` clear the date; never fill an empty date with a default. Fields missing from the line stay as
+  they are.
+- Title changed: append a line `Original title: <old title>` to the page body.
+- The body: only append (`insert_content` at the end), never `replace_content` or rewrite. The user's notes, the
+  captured source line, quote and link always stay.
+- `agenda`: append one bullet to the body of the Agenda card named in `agenda` (the card title, the note if any, a
+  link to the source or the card), then move the Inbox card to Trash. Empty `agenda`: skip the card and report it.
+- `trash`: `notion-delete-pages` with `user_confirmed: true` (the pasted line is the user's explicit request); the page
+  can be restored from Trash.
+- `note`: a correction or context for every card of the entry (e.g. "project Hiring", "no project", "this is about
+  PROJ-1234"). Apply it on top of the fields. If it contradicts the fields, apply nothing for that entry and report it.
+- After every line, set the entry's `result` in the page JSON, then re-render once at the end.
