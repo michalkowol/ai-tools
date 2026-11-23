@@ -4,6 +4,7 @@
 
 | Date | Title | Status | File |
 |------|-------|--------|------|
+| 2026-11-23 | Inbox: no untitled cards, read Gmail and the notion label | implemented | [2026-11-23-inbox-untitled-and-gmail-label.html](specs/2026-11-23-inbox-untitled-and-gmail-label.html) |
 | 2026-11-23 | Inbox: one entry at a time, built from Web Components | implemented | [2026-11-23-inbox-one-entry-redesign.html](specs/2026-11-23-inbox-one-entry-redesign.html) |
 | 2026-11-22 | Inbox: capture into Notion and fast processing | implemented | [2026-11-22-inbox-capture-and-processing.html](specs/2026-11-22-inbox-capture-and-processing.html) |
 | 2026-11-22 | Move html-spec-init out of mk into a separate plugin | implemented | [2026-11-22-html-spec-separate-plugin.html](specs/2026-11-22-html-spec-separate-plugin.html) |

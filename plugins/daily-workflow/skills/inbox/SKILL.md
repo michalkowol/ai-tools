@@ -39,7 +39,8 @@ Runs only when the user asks. Tell the user it takes a few minutes, then work th
    already have a card.
 5. Create one card per remaining candidate in the Notion data source: Status Inbox, Category Work, the source URL in
    URL, an action title and a short body (format in `capture.md`). No other fields. This is the only change to Notion
-   that needs no approval, and it never touches existing cards.
+   that needs no approval, and it never touches existing cards. For every email that got a card or was already in
+   Notion, add the Gmail label `notion` (`capture.md`); nothing else on the mail changes.
 6. `worklog inbox record --cursor <started_at>` with every URL that got a card or was already in Notion (JSON list on
    stdin). Run it even when nothing was created, so the cursor moves. If a Slack or Gmail source failed, record
    without `--cursor`: the next capture covers the same window again and the registry skips what is already in.

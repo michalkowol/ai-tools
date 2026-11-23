@@ -31,10 +31,17 @@ The PR URL is the key. A PR is captured once; its card carries the state at capt
 
 ## Gmail
 
-- `in:inbox category:primary is:unread after:<since day>`, then keep only messages newer than `<since>`.
+- `in:inbox category:primary -label:notion`, no time window: read mail that is still in the inbox counts too. For
+  Gmail the `notion` label replaces the cursor.
 - Keep a thread only when someone asks the user something or needs their action, and the user has not replied later
   in the thread. Skip GitHub, Jira, calendar and other notification mail, newsletters and receipts.
 - The thread URL `https://mail.google.com/mail/u/0/#all/<thread id>` is the key.
+- After the Notion card is created, add the label `notion` to the thread (create the label first if it does not
+  exist). Also label threads skipped because they already have a card in Notion. Change nothing else on the mail:
+  read/unread, archive, star and other labels stay.
+- If the connector cannot add the label, still create the cards and report it: in the answer and as
+  `{"source": "Gmail label", "reason": "…"}` in `missing_sources` of the page JSON. Duplicates are then caught by the
+  registry and the URL lookup in Notion.
 
 ## Duplicates
 

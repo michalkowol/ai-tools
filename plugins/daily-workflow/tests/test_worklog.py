@@ -433,6 +433,16 @@ class InboxTest(WorklogTestCase):
             self.assertIn(f'assets/{name}', page)
         self.assertNotIn("<style", page)
 
+    def test_render_fills_empty_first_card_title_with_original(self):
+        data = self.page_data(entries=[{
+            "id": "t1", "title": "Review shop#250: Add release notes endpoint", "created_at": "2026-11-22T10:00:00+01:00",
+            "cards": [{"outcome": "trash", "title": ""}, {"outcome": "next", "title": ""}],
+        }])
+        _, html_path = self.render_page(data)
+        page = html_path.read_text()
+        self.assertIn('<inbox-card outcome="trash" category="Work">Review shop#250: Add release notes endpoint</inbox-card>', page)
+        self.assertIn('<inbox-card outcome="next" category="Work"></inbox-card>', page)
+
     def test_render_escapes_content_and_drops_unsafe_links(self):
         _, html_path = self.render_page(self.page_data())
         page = html_path.read_text()

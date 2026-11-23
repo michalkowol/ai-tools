@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Inbox: no untitled cards, read Gmail and the notion label</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-23" status="implemented">
+    <h1>Inbox: no untitled cards, read Gmail and the notion label</h1>
+    <p>Two fixes to <code>/daily-workflow:inbox</code>: the page no longer shows <code>(untitled)</code>, and the Gmail capture also takes read mail from the inbox and marks it with the <code>notion</code> label.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>The first real processing run (35 entries) showed two problems. A card with a Trash proposal showed <code>(untitled)</code> as its main title, which looks like a bug and does not say what will be deleted. The Gmail capture skips mail the user has read but not archived, although it still waits for action in the inbox. The user also wants to see in Gmail which mail already has a task in Notion: the <code>notion</code> label, without changing any other property of the mail (read/unread, archive, star and other labels stay).</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <h3>Page</h3>
+    <ul>
+      <li>An empty card title renders as <code>c.title || '(untitled)'</code>. <cite><code>plugins/daily-workflow/scripts/wl/assets/inbox-components.js:323</code></cite></li>
+      <li>The apply line carries no title for Trash (<code>if (c.outcome !== 'trash') out.title = c.title</code>), and the rule says "plus title, except for Trash and Keep", so the AI leaves the title out of a Trash proposal. <cite><code>scripts/wl/assets/inbox-logic.js:107</code>, <code>skills/inbox/references/processing.md:77</code></cite></li>
+      <li>A card added with <code>+</code> and left with an empty title is removed when leaving the entry. <cite><code>inbox-components.js</code>, spec 2026-11-23-inbox-one-entry-redesign</cite></li>
+    </ul>
+    <h3>Gmail</h3>
+    <ul>
+      <li>Capture query: <code>in:inbox category:primary is:unread after:&lt;since day&gt;</code>, then only messages newer than <code>since</code>. The key is the thread URL <code>#all/&lt;thread id&gt;</code>. <cite><code>skills/inbox/references/capture.md:32-37</code></cite></li>
+      <li>Duplicates: a 30-day URL registry plus an SQL query on <code>userDefined:URL</code> in Notion. <cite><code>capture.md</code>, section Duplicates</cite></li>
+      <li>In this session the Gmail connector is not signed in (only <code>authenticate</code> is available), so it could not be checked whether it has an operation that adds a label. <cite>session tool list</cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Changing other properties of the mail: read/unread, archiving, star, other labels.</li>
+      <li>Slack and GitHub capture.</li>
+      <li>Gmail categories other than Primary.</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Page">
+      <p class="q">What to show instead of <code>(untitled)</code>?</p>
+      <spec-option value="A" label="There is always a title" recommended chosen>The AI proposes an action title for Trash and Keep too. If card 1 still has an empty title, the renderer puts in the original title. A card added by hand without a title shows a grayed placeholder "Click to add a title". After switching Trash to Next the title is ready at once.</spec-option>
+      <spec-option value="B" label="Trash and Keep without a title">Trash and Keep have no title line, only "Original" and the fields. After a status change the title is taken from the original. Less text on screen, but the title appears and disappears.</spec-option>
+      <spec-option value="C" label="Renderer rejects an empty title">A card without a title is a <code>render-inbox</code> error (exit 1), the AI must fix the JSON. A clean page, but one mistake blocks the whole page.</spec-option>
+      <p class="why">Recommended option accepted. The title on screen always says what the card is about, and switching the status needs no retyping.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Page">
+      <p class="q">What does the title of a Trash card look like?</p>
+      <spec-option value="A" label="Struck through and grayed" recommended chosen>It is obvious at once that the card will disappear. It can still be edited by clicking.</spec-option>
+      <spec-option value="B" label="Normal">Like every other card, the status is only visible in the chip.</spec-option>
+      <p class="why">Recommended option accepted. The look shows the effect of Trash without reading the chip.</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Gmail">
+      <p class="q">Which mail does the capture take?</p>
+      <spec-option value="A" label="The whole inbox without the notion label" recommended chosen><code>in:inbox category:primary -label:notion</code>, no time window. Read but unarchived mail from a week ago also comes in. The <code>notion</code> label replaces the cursor for Gmail, so a mail does not come back twice.</spec-option>
+      <spec-option value="B" label="Window from the cursor, without is:unread"><code>in:inbox category:primary after:&lt;since day&gt;</code>. Read mail too, but only from the window since the last capture; old mail in the inbox is skipped.</spec-option>
+      <p class="why">Recommended option accepted. Everything still in the inbox is a candidate, and the label is the dedup key.</p>
+    </spec-decision>
+
+    <spec-decision did="D4" round="1" from="Q4" topic="Gmail">
+      <p class="q">When is the <code>notion</code> label added?</p>
+      <spec-option value="A" label="At capture" recommended chosen>Right after the card is created in Notion. The mail drops out of later captures at once. The label means "is in Notion", even if the card later goes to Trash.</spec-option>
+      <spec-option value="B" label="At apply">Only when the card from the mail gets a status other than Trash and Keep. The label means "there is a task", but until apply the mail can come back in capture (only the URL registry protects it).</spec-option>
+      <p class="why">Recommended option accepted. It works together with <a href="#D3">D3</a>: the query skips labelled mail.</p>
+    </spec-decision>
+
+    <spec-decision did="D5" round="1" from="Q5" topic="Gmail">
+      <p class="q">What if the <code>notion</code> label does not exist or the connector cannot add it?</p>
+      <spec-option value="A" label="Create the label, only report an error" recommended chosen>A missing label is created. If the Gmail connector has no label operations, the cards are still created, and the answer and the page say the label was not added (duplicates are caught by the URL registry and the URL query in Notion).</spec-option>
+      <spec-option value="B" label="Skip Gmail">Without the label the Gmail capture does not run and goes to "Missing sources".</spec-option>
+      <p class="why">Recommended option accepted. A missing label must not block the capture; the other dedup layers still work.</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-23-inbox-untitled-and-gmail-label.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>

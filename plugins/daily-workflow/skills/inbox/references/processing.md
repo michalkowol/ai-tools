@@ -37,7 +37,8 @@ order in the file does not matter.
 
 - `title`: the current Notion title, shown as "Original: …". `url`: the Notion page. `source`: from the URL field and
   the card body; `null` for entries added by hand.
-- `cards`: the proposal, at least one. Card 1 is always the original page, the others become new cards.
+- `cards`: the proposal, at least one. Card 1 is always the original page, the others become new cards. Every card has
+  a `title`, Trash and Keep too; if card 1 has none, the renderer shows the original title.
 - `waiting_on_me`: someone is blocked on the user (a direct question, a review request, a requested change). These
   entries go first, then entries whose first card has a due date, then the rest oldest first (`created_at`).
 - `why`: one line for the whole entry; for a split it says why.
@@ -57,7 +58,8 @@ order in the file does not matter.
 | `trash` | no action and nothing to keep (FYI, already handled, noise) | move the page to Trash |
 | `keep` | not enough information to decide | no change, stays in the Inbox |
 
-- Title: always propose an action title, not only when the current one is vague: verb first, what and for whom,
+- Title: always propose an action title for every card, Trash and Keep included (the page shows it, struck
+  through for Trash, and it is ready when the user switches the status), not only when the current one is vague: verb first, what and for whom,
   about 60 characters, the PR reference in parentheses, e.g. `Review Alice's batch processing (shop#412)`,
   `Approve vitest security bump (web#175)`.
 - Title language follows the entry: captured entries in English; entries the user added by hand in another language

@@ -319,8 +319,9 @@
       const editing = this.editing?.what === 'title' && this.editing.card === j;
       const title = editing
         ? h('input', { class: 'tinput', value: c.title, placeholder: 'Title of the new card' })
-        : h('div', { class: 'ptitle', title: 'Click to rename', onclick: () => { this.editing = { what: 'title', card: j }; this.render(); } },
-          c.title || '(untitled)', tag);
+        : h('div', { class: 'ptitle' + (c.outcome === 'trash' ? ' trash' : '') + (c.title ? '' : ' empty'), title: 'Click to rename',
+          onclick: () => { this.editing = { what: 'title', card: j }; this.render(); } },
+          c.title || 'Click to add a title', tag);
       return h('div', { class: n > 1 ? 'sub multi' : 'sub' },
         n > 1 ? h('div', { class: 'subhead' }, h('span', { class: 'num' }, `Card ${j + 1}`),
           h('button', { class: 'rm', type: 'button', title: 'Remove this card', onclick: () => this.removeCard(j) }, '×')) : null,

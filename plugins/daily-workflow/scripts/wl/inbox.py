@@ -148,11 +148,12 @@ def _category(value: Any) -> str:
     return "Home" if "Home" in cats else "Work"
 
 
-def _card(card: dict[str, Any]) -> str:
+def _card(card: dict[str, Any], fallback_title: Any = "") -> str:
     outcome = card.get("outcome") if card.get("outcome") in OUTCOMES else "keep"
     attrs = [("outcome", outcome), ("category", _category(card.get("category")))]
     attrs += [(k, card.get(k)) for k in CARD_ATTRS[2:]]
-    return f"    <inbox-card{_attrs(attrs)}>{e(card.get('title'))}</inbox-card>\n"
+    title = card.get("title") or fallback_title
+    return f"    <inbox-card{_attrs(attrs)}>{e(title)}</inbox-card>\n"
 
 
 def _entry(entry: dict[str, Any]) -> str:
@@ -167,7 +168,7 @@ def _entry(entry: dict[str, Any]) -> str:
     return (
         f"  <inbox-entry{head}>\n"
         f"    <inbox-original{orig}>{e(entry.get('title'))}</inbox-original>\n"
-        + "".join(_card(c) for c in cards)
+        + "".join(_card(c, entry.get("title") if i == 0 else "") for i, c in enumerate(cards))
         + why
         + "  </inbox-entry>\n"
     )
