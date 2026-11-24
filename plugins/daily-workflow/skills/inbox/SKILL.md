@@ -32,7 +32,8 @@ Runs only when the user asks. Tell the user it takes a few minutes, then work th
    and `started_at`.
 2. Gather the candidates from every source in `capture.md`, in parallel. A source that fails goes to
    `missing_sources` and capture continues.
-3. Keep only items that want something from the user and are still open (rules in `capture.md`). One candidate per
+3. Keep only items that want something from the user and are still open (rules in `capture.md`). Small PRs waiting
+   for review are skipped and only counted. One candidate per
    thread, PR or email, keyed by its source URL.
 4. Duplicates: pipe the candidate URLs as a JSON list into `worklog inbox check`, drop `known`. Then look up the
    `new` URLs in Notion (one query on the URL field over the whole database, not only the Inbox) and drop those that
@@ -61,7 +62,8 @@ fixes what is wrong. An entry can become several cards.
 4. Write `~/.ai/worklog/inbox/<YYYY-MM-DD-HHMM>.json` (schema in `processing.md`) and run
    `worklog render-inbox <file>`. It orders the entries (blocking others first), writes the page next to the JSON,
    refreshes `inbox/assets/` and prints the `open …` command. It fails on the old format (top-level `cards`).
-5. Answer briefly: how many cards were captured, skipped as duplicates and are in the Inbox, the failed sources, the
+5. Answer briefly: how many cards were captured, skipped as duplicates, small PRs left for the code review card, and
+   are in the Inbox, the failed sources, the
    `open …` command (the user runs it on the host), and that the prompt from the summary at the end of the page goes
    back into this session.
 

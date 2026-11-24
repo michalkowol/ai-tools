@@ -25,7 +25,12 @@ it or added any reaction to it. Several messages in one thread make one candidat
 
 - `review_requested`: every PR waiting for the user's review (direct or team). Skip drafts unless requested
   directly. Bot PRs are separate cards too.
-- `my_prs`: PRs with `review_decision` `CHANGES_REQUESTED`, `ci` `failing`, or waiting for review for more than a day.
+- Small PRs: skip every `review_requested` PR with `size.small` (fewer than 10 changed files), always, also on a
+  direct request. The user's recurring code review card (it links to `github.com/pulls/reviews`) covers them. Do not
+  record their URLs, so a PR that grows past the threshold gets a card in a later capture, and never change the
+  recurring card. Count them for the answer: "N small PRs left for the code review card".
+- `my_prs`: PRs with `review_decision` `CHANGES_REQUESTED`, `ci` `failing`, or waiting for review for more than a day. Own PRs
+  always get a card, whatever their size.
 
 The PR URL is the key. A PR is captured once; its card carries the state at capture time.
 
@@ -60,6 +65,6 @@ One card per thread, PR or email.
 - Status `Inbox`, Category `Work`, URL = the source URL. No Estimate, tags, dates or project: that is processing.
 - Body, plain paragraphs:
   - source line: `Slack DM from Alice, 2026-11-23 10:42` / `#team-proj, thread by Bob` / `PR org/shop#412 by alice,
-    waiting 26 h` / `Email from Carol <carol@…>, 2026-11-23 09:10`
+    waiting 26 h, 7 files (+120/−30)` (PRs always end with the size from `size`) / `Email from Carol <carol@…>, 2026-11-23 09:10`
   - a short verbatim quote (one or two sentences) of the ask
   - the link again

@@ -16,7 +16,7 @@ from unittest import mock
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from wl import collector, core, inbox, plan, summarizer, views  # noqa: E402
+from wl import collector, core, github, inbox, plan, summarizer, views  # noqa: E402
 
 FAKE_CLAUDE = textwrap.dedent(
     """\
@@ -323,6 +323,26 @@ class PlanTest(WorklogTestCase):
         self.assertIn("proposed, created after the daily", page)
         self.assertIn("Missing sources", page)
         self.assertNotIn("Resolved", page)
+
+
+class GithubEstimateTest(unittest.TestCase):
+    def test_estimate_by_changed_files(self):
+        cases = {1: "0.25 x 🍅", 3: "0.25 x 🍅", 4: "0.5 x 🍅", 9: "0.5 x 🍅", 10: "1 x 🍅", 19: "1 x 🍅",
+                 20: "2 x 🍅", 39: "2 x 🍅", 40: "3 x 🍅", 400: "3 x 🍅"}
+        for files, expected in cases.items():
+            self.assertEqual(github.estimate(files), expected, files)
+        self.assertIsNone(github.estimate(None))
+
+    def test_small_is_under_ten_files(self):
+        self.assertTrue(github.is_small(9))
+        self.assertFalse(github.is_small(10))
+        self.assertFalse(github.is_small(None))
+
+    def test_slim_carries_size_estimate(self):
+        pr = {"url": "https://github.com/org/shop/pull/412", "number": 412, "title": "T", "changedFiles": 7,
+              "additions": 120, "deletions": 30, "author": {"login": "alice"}}
+        self.assertEqual(github.slim(pr, "me")["size"],
+                         {"additions": 120, "deletions": 30, "files": 7, "estimate": "0.5 x 🍅", "small": True})
 
 
 class InboxTest(WorklogTestCase):

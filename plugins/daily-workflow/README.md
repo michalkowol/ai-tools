@@ -9,7 +9,8 @@ Personal Claude Code plugin with three parts that share one local Worklog:
   transcript and schedules the Deep Work block, `home` plans home tasks.
 - **Inbox**: `/daily-workflow:inbox` captures unanswered Slack messages, saved Slack items, PRs waiting for review,
   own PRs that need action and important email into the Notion GTD Inbox, then renders the whole Inbox as an HTML
-  page that shows one entry at a time with the AI proposal already chosen.
+  page that shows one entry at a time with the AI proposal already chosen. PRs under 10 changed files waiting for review get no card:
+  a recurring code review card in Notion covers them.
 
 ## Setup
 

@@ -66,7 +66,12 @@ order in the file does not matter.
   keep it (e.g. a Polish card gets a Polish action title).
 - Split: when the title or body holds several independent actions, one card per action. Card 1 is the main action.
 - Estimate and priority as in `gtd-rules.md`: light ≤ 1 x 🍅, heavy ≥ 2 x 🍅, `None` for work tracked in Jira and for
-  Agenda; one of P1, P2, P3. Reviews are usually light, P1 when the author is blocked.
+  Agenda; one of P1, P2, P3. P1 for a review when the author is blocked.
+- PR estimate from the changed files in the source line (`7 files (+120/−30)`): 1–3 files 0.25 x 🍅, 4–9 0.5 x 🍅,
+  10–19 1 x 🍅, 20–39 2 x 🍅, 40+ 3 x 🍅. Without a file count, open the PR size with `worklog github` only if the PR
+  is still listed there, otherwise estimate as usual.
+- Small review PR (someone else's PR waiting for the user's review, fewer than 10 files): propose `trash` with the
+  reason "small PR, covered by the code review card". Own PRs (the user is the author) are never trashed by this rule.
 - Reminder: today for blocking items, otherwise the day it makes sense, never in the past. Due Date only for a real
   deadline stated in the source.
 - Category: `Work` for captured entries; for entries added by hand judge from the content (`Home`, or both).

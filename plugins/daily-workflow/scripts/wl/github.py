@@ -53,6 +53,22 @@ def hours_since(ts: str | None) -> float | None:
     return round((core.now() - core.parse_ts(ts.replace("Z", "+00:00"))).total_seconds() / 3600, 1)
 
 
+# Review estimate by changed files: (files below, estimate). Small PRs are covered by the recurring code review card.
+ESTIMATE_BY_FILES = ((4, "0.25 x 🍅"), (10, "0.5 x 🍅"), (20, "1 x 🍅"), (40, "2 x 🍅"))
+LARGEST_ESTIMATE = "3 x 🍅"
+SMALL_ESTIMATES = ("0.25 x 🍅", "0.5 x 🍅")
+
+
+def estimate(files: int | None) -> str | None:
+    if files is None:
+        return None
+    return next((value for limit, value in ESTIMATE_BY_FILES if files < limit), LARGEST_ESTIMATE)
+
+
+def is_small(files: int | None) -> bool:
+    return estimate(files) in SMALL_ESTIMATES
+
+
 def slim(pr: dict[str, Any], me: str) -> dict[str, Any]:
     comments = pr.get("comments") or []
     requests = pr.get("reviewRequests") or []
@@ -70,7 +86,8 @@ def slim(pr: dict[str, Any], me: str) -> dict[str, Any]:
         "updated_at": pr.get("updatedAt"),
         "age_hours": hours_since(pr.get("createdAt")),
         "idle_hours": hours_since(pr.get("updatedAt")),
-        "size": {"additions": pr.get("additions"), "deletions": pr.get("deletions"), "files": pr.get("changedFiles")},
+        "size": {"additions": pr.get("additions"), "deletions": pr.get("deletions"), "files": pr.get("changedFiles"),
+                 "estimate": estimate(pr.get("changedFiles")), "small": is_small(pr.get("changedFiles"))},
         "review_decision": pr.get("reviewDecision") or None,
         "review_requested": [r for r in requested if r],
         "requested_from_me_directly": me in requested,

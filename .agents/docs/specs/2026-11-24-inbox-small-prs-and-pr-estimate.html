@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Inbox: skip small PRs and estimate PRs by changed files</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-24" status="implemented">
+    <h1>Inbox: skip small PRs and estimate PRs by changed files</h1>
+    <p>Capture creates no separate cards for small PRs waiting for review, because the recurring "code review" card in Notion covers them. The estimate (🍅) of a PR follows from the number of changed files.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>The user has a recurring code review card in Notion whose body links to <code>https://github.com/pulls/reviews</code>. It already covers all small PRs, so separate Inbox cards for them are noise. Large PRs still need their own card to plan time for them, and the estimate should follow from the PR size instead of guessing.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <h3>Recurring card</h3>
+    <ul>
+      <li>A card in GTD: Category Work, Estimate 2 x 🍅, tag ♻️ Recurring, an embedded link to <code>github.com/pulls/reviews</code> in the body, the URL field empty. <cite>Notion fetch of the card, 2026-11-24</cite></li>
+      <li>The skill has no reference to this card today and no config key for it. <cite><code>skills/inbox/</code>, <code>scripts/wl/core.py</code></cite></li>
+    </ul>
+    <h3>GitHub</h3>
+    <ul>
+      <li><code>worklog github</code> returns <code>size: {additions, deletions, files}</code> for every PR (from <code>changedFiles</code>). <cite><code>scripts/wl/github.py:73</code></cite></li>
+      <li>Capture: every <code>review_requested</code> PR is a card (drafts only on a direct request, bots too); <code>my_prs</code> on CHANGES_REQUESTED, failing CI or waiting more than a day. <cite><code>skills/inbox/references/capture.md</code>, section GitHub</cite></li>
+    </ul>
+    <h3>Estimate</h3>
+    <ul>
+      <li>Capture sets no Estimate; processing: "light ≤ 1 x 🍅, heavy ≥ 2 x 🍅 … Reviews are usually light". <cite><code>capture.md</code> section Card, <code>processing.md</code> Proposal rules</cite></li>
+      <li>Estimate values: 0.25, 0.5, 1, 2, 3, 4, 5, 6, 10 x 🍅, None. <cite>GTD data source schema; <code>skills/briefing/references/gtd-rules.md:17</code></cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Changes to the recurring code review card (Status, Reminder, body).</li>
+      <li>The review order in the briefing.</li>
+      <li>Slack and Gmail capture.</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Estimate">
+      <p class="q">How does the number of changed files translate into tomatoes?</p>
+      <spec-option value="A" label="5 thresholds" recommended chosen>1–3 files: 0.25 · 4–9: 0.5 · 10–19: 1 · 20–39: 2 · 40+: 3 x 🍅. Fine steps at the bottom, where most PRs are.</spec-option>
+      <spec-option value="B" label="3 thresholds">1–9 files: 0.5 · 10–29: 1 · 30+: 2 x 🍅. Simpler, but does not tell a one-liner from a medium PR.</spec-option>
+      <spec-option value="C" label="Files + lines">Thresholds as in A, one step up for many lines (e.g. &gt; 500 changes); lockfiles and generated files do not count. More precise, but more rules to maintain.</spec-option>
+      <p class="why">Recommended option accepted. Most PRs are small, so the lower thresholds are denser.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Small PRs">
+      <p class="q">Which PR is "small" and gets no separate card?</p>
+      <spec-option value="A" label="Estimate ≤ 0.5 x 🍅" recommended chosen>By the thresholds from Q1 (in A: fewer than 10 files). Separate cards only for reviews that need planned time.</spec-option>
+      <spec-option value="B" label="Estimate 0.25 x 🍅">Only the smallest (in A: 1–3 files). More cards in the Inbox.</spec-option>
+      <spec-option value="C" label="Estimate ≤ 1 x 🍅">Separate cards only for large PRs (in A: 20+ files). Few cards, but an hour-long review disappears into the recurring card.</spec-option>
+      <p class="why">Recommended option accepted. A separate card only for reviews that need planned time (10+ files per <a href="#D1">D1</a>).</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Small PRs" outcome="dropped">
+      <p class="q">Which PRs does skipping cover?</p>
+      <spec-option value="A" label="Only review_requested" recommended>PRs waiting for my review (direct and through a team), from bots too. My PRs (<code>my_prs</code>: changes to make, failing CI) always get a card, because the recurring card does not cover them.</spec-option>
+      <spec-option value="B" label="All PRs">Small <code>my_prs</code> too. Fewer cards, but e.g. failing CI on my PR can be missed.</spec-option>
+      <spec-option value="other" label="Other" chosen></spec-option>
+      <p class="note">I don't understand this question</p>
+      <p class="why">The question was unclear; asked again more simply as Q8 (<a href="#D8">D8</a>).</p>
+    </spec-decision>
+
+    <spec-decision did="D4" round="1" from="Q4" topic="Small PRs">
+      <p class="q">Does a small PR waiting for review still get a card in some situation?</p>
+      <spec-option value="A" label="Never" recommended chosen>All small ones go to the recurring card, which leads to <code>github.com/pulls/reviews</code>, where they are all visible. The simplest rule.</spec-option>
+      <spec-option value="B" label="When the author waits long">E.g. waits &gt; 2 workdays. A guard against a forgotten PR, but a rule with a number.</spec-option>
+      <spec-option value="C" label="When asked directly">A direct request (not through a team) always gives a card. Some small PRs come back to the Inbox anyway.</spec-option>
+      <p class="why">Recommended option accepted. The recurring card leads to <code>pulls/reviews</code>, where all small PRs are visible.</p>
+    </spec-decision>
+
+    <spec-decision did="D5" round="1" from="Q5" topic="Small PRs">
+      <p class="q">What does capture do with a skipped small PR?</p>
+      <spec-option value="A" label="Only counts, does not record" recommended chosen>The answer says "N small PRs left for the code review card". The URL does not go into the registry, so when the PR grows above the threshold, the next capture creates a card for it. The skill does not change the recurring card.</spec-option>
+      <spec-option value="B" label="Records in the registry">The URL goes into the registry as for a card, so the PR does not come back for 30 days, even if it grows.</spec-option>
+      <spec-option value="C" label="Appends to the recurring card">Adds a bullet with a link to the PR in the code review card body. A list in Notion, but the card grows and duplicates <code>pulls/reviews</code>.</spec-option>
+      <p class="why">Recommended option accepted. A PR that grows above the threshold gets a card in a later capture; the skill does not change the recurring card.</p>
+    </spec-decision>
+
+    <spec-decision did="D6" round="1" from="Q6" topic="Estimate">
+      <p class="q">Where does processing get the number of files for the estimate?</p>
+      <spec-option value="A" label="From the card's source line" recommended chosen>Capture appends the size: <code>PR org/shop#412 by alice, waiting 26 h, 7 files (+120/−30)</code>. Processing computes the estimate from this line, without running <code>gh</code> again.</spec-option>
+      <spec-option value="B" label="Capture sets Estimate">The card has Estimate from the thresholds at once. One source of truth in Notion, but breaks the rule "capture sets only Status, Category, URL".</spec-option>
+      <spec-option value="C" label="Processing asks GitHub">Processing calls <code>worklog github</code> again. Always the current size, but slower and duplicate queries.</spec-option>
+      <p class="why">Recommended option accepted. The size is already in the capture data, processing does not need to ask GitHub a second time.</p>
+    </spec-decision>
+
+    <spec-decision did="D7" round="1" from="Q7" topic="Small PRs">
+      <p class="q">What about cards for small PRs that are already in the Inbox?</p>
+      <spec-option value="A" label="Propose Trash" recommended chosen>Processing proposes Trash with the reason "small PR, covered by the code review card". The user can change it on the page.</spec-option>
+      <spec-option value="B" label="Leave them">The rule applies only to new captures; old cards are processed normally.</spec-option>
+      <p class="why">Recommended option accepted. Old small-PR cards go away by the same rule, and the user can change the proposal on the page.</p>
+    </spec-decision>
+
+    <spec-decision did="D8" round="2" from="Q8" topic="Small PRs">
+      <p class="q">Skip small PRs that you authored too?</p>
+      <spec-option value="A" label="No, my PRs always get a card" recommended chosen>Only small PRs by others waiting for review are skipped. Your action on your own PR (fixes, CI) is not code review, so it does not get lost in the recurring card.</spec-option>
+      <spec-option value="B" label="Yes, always skip small ones">Fewer cards, but e.g. failing CI or a change request on a small own PR does not reach the Inbox.</spec-option>
+      <p class="why">Recommended option accepted. The recurring card covers only reviews of other people's PRs.</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-24-inbox-small-prs-and-pr-estimate.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>
