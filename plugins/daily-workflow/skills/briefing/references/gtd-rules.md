@@ -52,7 +52,7 @@ In SQL, dates are `date:Reminder:start`, `date:Due Date:start`, and the URL is `
 - Outside the limit: ♻️ Recurring cards (e.g. "Morning code review", "Language practice", "GTD Weekly Review" on Friday, "Weekly team report"), Waiting for follow-ups, fixed Calendar appointments, Agenda topics.
 - Only cards with Category Work (cards with both Work and Home count).
 - The plan is saved as a Reminder on the day; the status stays Next Actions. Today candidates only for the current days.
-- A sprint ticket from a project in `[worklog].jira_project_keys` that is in the deep focus slot and has no card yet (match by the card URL) gets a card: Category Work, URL to the ticket in `[notion].jira_base_url`, Estimate None, Reminder on the first day of the slot, Due Date on the last.
+- A sprint ticket from a project in `[worklog].jira_project_keys` that is in the deep focus slot and has no card yet (match by the card URL) gets a card: Category Work, URL `<[jira].base_url>/browse/<KEY>`, Estimate None, Reminder on the first day of the slot, Due Date on the last.
 
 ## Home mode plan
 

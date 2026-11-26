@@ -24,7 +24,8 @@ Personal Claude Code plugin with three parts that share one local Worklog:
 
 The first hook creates `~/.ai/worklog` as a local git repo with `config.toml` from
 [config.example.toml](config.example.toml). Fill in `[worklog].jira_project_keys`,
-`[github].team_repos`, `[slack].channels`, the `[notion]` IDs of your GTD database and views, and check `[workday]`.
+`[github].team_repos`, `[slack].channels`, the `[notion]` IDs of your GTD database and views, `[jira].base_url`,
+and check `[workday]`.
 
 ## Usage
 

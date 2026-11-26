@@ -10,10 +10,6 @@ summary_timeout_seconds = 240
 # Jira project keys recognised in branch and worktree names. Empty = any KEY-123.
 jira_project_keys = ["PROJ"]
 
-[time]
-# Empty = the container's TZ. A name such as "Europe/Warsaw" needs tzdata in the image.
-timezone = ""
-
 [workday]
 start = "09:00"
 end = "17:30"
@@ -47,4 +43,7 @@ view_overdue = "view://00000000-0000-0000-0000-000000000002"
 view_waiting_for = "view://00000000-0000-0000-0000-000000000003"
 view_agenda_errands = "view://00000000-0000-0000-0000-000000000004"
 view_inbox = "view://00000000-0000-0000-0000-000000000005"
-jira_base_url = "https://example.atlassian.net"
+
+[jira]
+# Jira site; ticket links are <base_url>/browse/<KEY>.
+base_url = "https://example.atlassian.net"

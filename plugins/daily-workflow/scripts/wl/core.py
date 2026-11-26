@@ -24,7 +24,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "jira_project_keys": [],
         "summary_timeout_seconds": 240,
     },
-    "time": {"timezone": ""},
 }
 
 
@@ -114,21 +113,9 @@ def reset_config_cache() -> None:
 
 # ---------------------------------------------------------------- time
 
-def tzinfo() -> dt.tzinfo | None:
-    name = (config().get("time") or {}).get("timezone") or ""
-    if name:
-        try:
-            from zoneinfo import ZoneInfo
-
-            return ZoneInfo(name)
-        except Exception:
-            log(f"[time] unknown timezone {name!r}, using the container local time")
-    return None
-
-
 def now() -> dt.datetime:
-    tz = tzinfo()
-    return dt.datetime.now(tz) if tz else dt.datetime.now().astimezone()
+    """Container local time; the launcher sets TZ to the host time zone."""
+    return dt.datetime.now().astimezone()
 
 
 def now_iso() -> str:
@@ -139,8 +126,7 @@ def parse_ts(value: str) -> dt.datetime:
     parsed = dt.datetime.fromisoformat(value)
     if parsed.tzinfo is None:
         parsed = parsed.astimezone()
-    tz = tzinfo()
-    return parsed.astimezone(tz) if tz else parsed
+    return parsed
 
 
 def last_workday(day: dt.date) -> dt.date:
