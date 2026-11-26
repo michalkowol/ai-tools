@@ -47,6 +47,19 @@ main { max-width: 760px; margin: 40px auto 110px; padding: 0 32px; }
 .progress span.ok { background: var(--olive); }
 .progress span.cur { background: var(--clay); }
 .progress span.last { flex: .3; }
+.progress span { position: relative; }
+.progress span.two::after { content: ''; position: absolute; left: 50%; top: -7px; width: 5px; height: 5px;
+  margin-left: -2.5px; border-radius: 50%; background: var(--olive); }
+
+/* two-minute rule: the action to do right now */
+.quick { border: 1.5px solid var(--olive); background: #F3F5EE; border-radius: 10px; padding: 12px 14px; margin: 12px 0; }
+.quick-h { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--olive);
+  margin-bottom: 4px; }
+.quick-a { color: var(--slate); font-size: 15px; }
+.quick-btns { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+.qbtn { font-family: var(--sans); font-size: 13px; padding: 5px 12px; border-radius: 8px; border: 1.5px solid var(--olive);
+  background: var(--olive); color: var(--white); cursor: pointer; text-decoration: none; }
+.qbtn.ghost { background: var(--white); color: var(--olive); }
 
 /* entry */
 .card { background: var(--white); border: 1.5px solid var(--gray-300); border-radius: 12px; padding: 28px 32px; }

@@ -13,6 +13,7 @@
  *       <inbox-original [href] [label]>original title</inbox-original>
  *       <inbox-card outcome category estimate priority reminder due project agenda>proposed title</inbox-card>
  *       <inbox-why>AI reason</inbox-why>
+ *       <inbox-two-minute>the action to do right now</inbox-two-minute>   only when the two-minute rule fits
  *     </inbox-entry>
  *   </inbox-app>
  *
@@ -64,6 +65,7 @@
         source: orig && orig.getAttribute('label')
           ? { label: orig.getAttribute('label'), url: safeUrl(orig.getAttribute('href')) } : null,
         why: (this.querySelector('inbox-why') || {}).textContent?.trim() || '',
+        twoMinute: (this.querySelector('inbox-two-minute') || {}).textContent?.trim() || '',
         cards: [...this.querySelectorAll('inbox-card')].map((c) => c.data),
       };
     }
@@ -235,6 +237,8 @@
       const cap = this.getAttribute('captured');
       if (cap !== null) parts.push(`${cap} captured, ${this.getAttribute('skipped') || 0} duplicates skipped`);
       parts.push(`${this.count} entries`);
+      const quick = this.entries.filter((e) => e.twoMinute).length;
+      if (quick) parts.push(`${quick} under 2 min`);
       return parts.join(' · ');
     }
     resetAll() {
@@ -274,7 +278,8 @@
     renderProgress() {
       const seg = (i, title, extra = {}) => h('span', Object.assign({
         title, onclick: () => this.go(i),
-        class: i === this.S.cur ? 'cur' : i < this.S.cur ? 'ok' : '',
+        class: [i === this.S.cur ? 'cur' : i < this.S.cur ? 'ok' : '', this.entries[i]?.twoMinute ? 'two' : '']
+          .filter(Boolean).join(' '),
       }, extra));
       return h('div', { class: 'progress' },
         this.entries.map((e, i) => seg(i, e.title)),
@@ -362,9 +367,23 @@
         h('div', { class: 'lbl' }, split ? `AI proposal · split into ${e.cards.length} cards` : 'AI proposal'),
         h('div', { class: 'orig' }, 'Original: ', origTitle, ' · ', source),
         cards.map((c, j) => this.renderCard(j, n)),
+        e.twoMinute ? this.renderTwoMinute(e) : null,
         h('button', { class: 'add', type: 'button', title: '+ · add another card from this entry', onclick: () => this.addCard() }, '+ Add card'),
         e.why ? h('div', { class: 'why' }, e.why) : null,
         this.renderNote(n));
+    }
+
+    // The two-minute rule: the concrete action, a link to where it is done and "Done, next".
+    renderTwoMinute(e) {
+      const url = e.source?.url || e.pageUrl;
+      const label = e.source?.url ? e.source.label : 'Notion card';
+      return h('div', { class: 'quick' },
+        h('div', { class: 'quick-h' }, '⏱ 2-minute rule: do it now'),
+        h('div', { class: 'quick-a' }, e.twoMinute),
+        h('div', { class: 'quick-btns' },
+          url ? h('a', { class: 'qbtn', href: url, target: '_blank', rel: 'noopener' }, `Open ${label} ↗`) : null,
+          h('button', { class: 'qbtn ghost', type: 'button', title: 'Set Done for every card and go to the next entry',
+            onclick: () => { this.setStatus('done'); this.go(this.S.cur + 1); } }, 'Done, next')));
     }
 
     renderSummary() {

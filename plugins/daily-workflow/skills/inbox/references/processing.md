@@ -24,6 +24,7 @@ order in the file does not matter.
       "created_at": "2026-11-19T10:00:00+01:00",
       "waiting_on_me": true,
       "why": "Review required and nobody approved yet; Alice waits 4 days.",
+      "two_minute": "",
       "cards": [
         {"outcome": "next", "title": "Review Alice's batch processing (shop#412)", "category": ["Work"],
          "estimate": "1 x 🍅", "priority": "P1", "reminder": "2026-11-23", "due": "", "project": "", "agenda": ""}
@@ -41,7 +42,11 @@ order in the file does not matter.
   a `title`, Trash and Keep too; if card 1 has none, the renderer shows the original title.
 - `waiting_on_me`: someone is blocked on the user (a direct question, a review request, a requested change). These
   entries go first, then entries whose first card has a due date, then the rest oldest first (`created_at`).
+  Two-minute entries (`two_minute`) come before all of them, in the same order among themselves.
 - `why`: one line for the whole entry; for a split it says why.
+- `two_minute`: one sentence with the concrete action when the entry meets the two-minute rule (e.g. "Reply 'yes,
+  keep the optional field' in the DM"), otherwise empty. The page shows it in a "do it now" box with a link to the
+  source, and these entries go first.
 - `result`: empty until `apply`, then e.g. `applied: Next Actions + 1 created`, `failed: <reason>`.
 - The old format (top-level `cards` with one `proposal` each) is rejected; run `process` again.
 
@@ -58,6 +63,9 @@ order in the file does not matter.
 | `trash` | no action and nothing to keep (FYI, already handled, noise) | move the page to Trash |
 | `keep` | not enough information to decide | no change, stays in the Inbox |
 
+- Two-minute rule: judge every entry. When the user can finish it right now in under two minutes (a short reply, an
+  approval, a yes/no answer, a quick lookup), set `two_minute` to the exact action and propose `done` for its card.
+  Not for reviews above 0.25 x 🍅 or for work that waits on someone else.
 - Title: always propose an action title for every card, Trash and Keep included (the page shows it, struck
   through for Trash, and it is ready when the user switches the status), not only when the current one is vague: verb first, what and for whom,
   about 60 characters, the PR reference in parentheses, e.g. `Review Alice's batch processing (shop#412)`,

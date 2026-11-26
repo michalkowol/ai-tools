@@ -467,6 +467,26 @@ class InboxTest(WorklogTestCase):
         ]
         self.assertEqual([x["id"] for x in inbox.order(entries)], ["blocking", "due", "old", "newer"])
 
+    def test_order_puts_two_minute_entries_first(self):
+        entries = [
+            {"id": "blocking", "created_at": "2026-11-22T12:00:00+01:00", "waiting_on_me": True, "cards": [{}]},
+            {"id": "quick-old", "created_at": "2026-11-20T10:00:00+01:00", "two_minute": "Reply yes", "cards": [{}]},
+            {"id": "quick-blocking", "created_at": "2026-11-22T10:00:00+01:00", "two_minute": "Approve",
+             "waiting_on_me": True, "cards": [{}]},
+            {"id": "old", "created_at": "2026-11-19T10:00:00+01:00", "cards": [{}]},
+        ]
+        self.assertEqual([x["id"] for x in inbox.order(entries)], ["quick-blocking", "quick-old", "blocking", "old"])
+
+    def test_render_two_minute_action(self):
+        data = self.page_data(entries=[{
+            "id": "q1", "title": "Reply to Alice", "created_at": "2026-11-22T10:00:00+01:00",
+            "two_minute": "Reply <yes> in the DM", "cards": [{"outcome": "done", "title": "Confirm field to Alice"}],
+        }, {"id": "n1", "title": "Other", "created_at": "2026-11-21T10:00:00+01:00", "cards": [{"outcome": "next", "title": "Other"}]}])
+        _, html_path = self.render_page(data)
+        page = html_path.read_text()
+        self.assertIn("<inbox-two-minute>Reply &lt;yes&gt; in the DM</inbox-two-minute>", page)
+        self.assertEqual(page.count("<inbox-two-minute>"), 1)
+
     def page_data(self, **extra):
         data = {
             "date": "2026-11-23", "generated_at": "2026-11-23T09:31:04+01:00",

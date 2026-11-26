@@ -122,12 +122,13 @@ def _ts(value: Any) -> str:
 
 
 def order(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Blocking others first, then entries whose first card has a due date (soonest first), then the rest,
-    oldest first."""
+    """Two-minute entries first; inside both groups blocking others first, then entries whose first card has a due
+    date (soonest first), then the rest, oldest first."""
     def key(entry: dict[str, Any]):
         cards = entry.get("cards") or [{}]
         due = (cards[0] or {}).get("due") or ""
-        return (0 if entry.get("waiting_on_me") else 1, 0 if due else 1, due, _ts(entry.get("created_at")) or "9999")
+        return (0 if entry.get("two_minute") else 1, 0 if entry.get("waiting_on_me") else 1, 0 if due else 1, due,
+                _ts(entry.get("created_at")) or "9999")
     return sorted([x for x in entries if x and x.get("id")], key=key)
 
 
@@ -165,11 +166,13 @@ def _entry(entry: dict[str, Any]) -> str:
                    ("waiting", bool(entry.get("waiting_on_me"))), ("result", entry.get("result"))])
     orig = _attrs([("href", safe_url(src.get("url"))), ("label", src.get("label"))]) if isinstance(src, dict) else ""
     why = f"    <inbox-why>{e(entry.get('why'))}</inbox-why>\n" if entry.get("why") else ""
+    two = f"    <inbox-two-minute>{e(entry.get('two_minute'))}</inbox-two-minute>\n" if entry.get("two_minute") else ""
     return (
         f"  <inbox-entry{head}>\n"
         f"    <inbox-original{orig}>{e(entry.get('title'))}</inbox-original>\n"
         + "".join(_card(c, entry.get("title") if i == 0 else "") for i, c in enumerate(cards))
         + why
+        + two
         + "  </inbox-entry>\n"
     )
 

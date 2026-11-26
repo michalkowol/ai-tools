@@ -4,6 +4,7 @@
 
 | Date | Title | Status | File |
 |------|-------|--------|------|
+| 2026-11-26 | Inbox: flag two-minute tasks clearly | implemented | [2026-11-26-inbox-two-minute-rule.html](specs/2026-11-26-inbox-two-minute-rule.html) |
 | 2026-11-24 | Briefing plan: checkboxes saved in localStorage | implemented | [2026-11-24-briefing-plan-checkboxes.html](specs/2026-11-24-briefing-plan-checkboxes.html) |
 | 2026-11-24 | Inbox: skip small PRs and estimate PRs by changed files | implemented | [2026-11-24-inbox-small-prs-and-pr-estimate.html](specs/2026-11-24-inbox-small-prs-and-pr-estimate.html) |
 | 2026-11-23 | Inbox: no untitled cards, read Gmail and the notion label | implemented | [2026-11-23-inbox-untitled-and-gmail-label.html](specs/2026-11-23-inbox-untitled-and-gmail-label.html) |

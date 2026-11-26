@@ -58,7 +58,8 @@ fixes what is wrong. An entry can become several cards.
    (`view_agenda_errands`, Status Agenda), today's date from `worklog dates`.
 3. Propose for every entry (rules in `processing.md`): one or more cards, each with an action title, status,
    Category, Estimate, priority, Reminder / Due Date and Project from existing options; split the entry when it holds
-   several independent actions; one line of reason for the entry.
+   several independent actions; one line of reason for the entry; for entries that meet the two-minute rule the
+   concrete action in `two_minute`.
 4. Write `~/.ai/worklog/inbox/<YYYY-MM-DD-HHMM>.json` (schema in `processing.md`) and run
    `worklog render-inbox <file>`. It orders the entries (blocking others first), writes the page next to the JSON,
    refreshes `inbox/assets/` and prints the `open …` command. It fails on the old format (top-level `cards`).
