@@ -65,6 +65,7 @@ In SQL, dates are `date:Reminder:start`, `date:Due Date:start`, and the URL is `
 
 - Never change Notion without the user's consent. Show the change plan first, apply after an explicit yes.
 - One exception: the inbox skill's capture creates new cards with Status Inbox without asking. It never changes existing cards; processing applies only what the user filled in on the inbox page.
+- The briefing `done` prompt pasted from the plan page sets Status `Done (today)` on the ticked Notion cards without asking again; it changes nothing else.
 - Every card must have Status, Category and Estimate, otherwise it lands in the Inbox view.
 - Tags and projects only from existing options. Never create a new project.
 - Propose only the Reminders for today's tasks and the cards for sprint tickets above, nothing else unless the user asks.

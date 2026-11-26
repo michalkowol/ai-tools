@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import shutil
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 from . import core
+from . import plan
 from .plan import e, safe_url
 
 REGISTRY_DAYS = 30
@@ -206,13 +206,7 @@ def render(data: dict[str, Any], file_label: str) -> str:
 
 
 def copy_assets(target: Path) -> None:
-    """The page links the assets relatively; overwrite them on every render so every page gets the current
-    version."""
-    target.mkdir(parents=True, exist_ok=True)
-    for name in ASSETS:
-        tmp = target / f".{name}.tmp"
-        shutil.copyfile(ASSETS_DIR / name, tmp)
-        tmp.replace(target / name)
+    plan.copy_assets(ASSETS, target)
 
 
 def render_file(json_path: Path, file_label: str) -> Path:

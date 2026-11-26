@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Briefing plan: checkboxes saved in localStorage</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-24" status="implemented">
+    <h1>Briefing plan: checkboxes saved in localStorage</h1>
+    <p>The day plan page (<code>~/.ai/worklog/plans/*.html</code>) gets checkboxes next to its items. The state is saved in <code>localStorage</code>, so it survives a page reload.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>The day plan from <code>/daily-workflow:briefing</code> is read-only today. The user wants to tick off on it what they have done during the day, without going back to the session for every item. The state must survive a page reload.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <ul>
+      <li>The page is built from <code>plans/YYYY-MM-DD[-home].json</code> by <code>worklog render-plan</code>; every value is escaped, only http(s) links are kept, the CSS is inline, there are no scripts. <cite><code>plugins/daily-workflow/scripts/wl/plan.py</code></cite></li>
+      <li>Lists are rendered by one function <code>items()</code> as <code>&lt;ol&gt;&lt;li&gt;</code>; agendas and the daily sections by <code>bullets()</code> as <code>&lt;ul&gt;</code>. <cite><code>plan.py:67-76</code></cite></li>
+      <li>Items usually have a <code>title</code> and <code>source.url</code> (tasks) or <code>url</code> (PRs). <cite><code>plan.py</code> <code>titled()</code>, <code>review()</code>; <code>skills/briefing/references/plan-schema.md</code></cite></li>
+      <li><code>briefing update</code> after the daily renders the same file again. <cite><code>skills/briefing/SKILL.md</code></cite></li>
+      <li>The page is opened from <code>file://</code> on the host (<code>open …</code>); localStorage works for <code>file://</code> in Chrome and Safari. <cite><code>worklog.py</code> <code>host_path</code>, the Inbox page uses localStorage the same way</cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Changes to the plan content and to the briefing rules outside the "done" mode.</li>
+      <li>Alpine.js and other JS dependencies.</li>
+      <li>Syncing between browsers or devices.</li>
+      <li>The Inbox page.</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Scope">
+      <p class="q">What does "adding a checkbox" mean?</p>
+      <spec-option value="A" label="Ticking off plan items" recommended chosen>Every list item has a checkbox that can be ticked as done.</spec-option>
+      <spec-option value="B" label="Ticking off + own items">Like A, plus an "+ add item" field at the bottom of a section where you add your own tasks with a checkbox (also in localStorage, they do not go to Notion).</spec-option>
+      <p class="why">Recommended option accepted. The checkboxes are for ticking off items the plan already has.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Scope">
+      <p class="q">Which sections have checkboxes?</p>
+      <spec-option value="A" label="Tasks to do" recommended chosen>Today's tasks, Outside the limit, Code review order, My pull requests, Needs attention, Prep for tomorrow, Follow-ups.</spec-option>
+      <spec-option value="B" label="Meeting agenda" chosen>Agenda points in Meetings, to tick off topics already discussed.</spec-option>
+      <spec-option value="C" label="Deep Work" chosen>One checkbox next to the Deep Work block.</spec-option>
+      <spec-option value="D" label="Every item on the page" chosen>Also For the daily, After the daily, Resolved and Notion changes, which are information, not tasks.</spec-option>
+      <p class="why">All options picked: every item on the page has a checkbox, including the meeting agenda, the Deep Work block and the information sections.</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Look">
+      <p class="q">What happens to a ticked item?</p>
+      <spec-option value="A" label="Struck through and grayed, stays in place" recommended chosen>The plan order does not change, what is done stays visible.</spec-option>
+      <spec-option value="B" label="Moves to the end of the section">Unfinished items are always on top, but the list jumps on click.</spec-option>
+      <spec-option value="C" label="Disappears, a &quot;show done&quot; toggle">The cleanest view, but done items have to be revealed.</spec-option>
+      <p class="why">Recommended option accepted. The plan order does not change.</p>
+    </spec-decision>
+
+    <spec-decision did="D4" round="1" from="Q4" topic="Storage">
+      <p class="q">How is an item recognised after the plan is rendered again?</p>
+      <spec-option value="A" label="By the item content" recommended chosen>Key = section + the item URL (or the title when there is no URL). A tick survives an update even when the item moves. Changing a title without a URL loses the tick.</spec-option>
+      <spec-option value="B" label="By the list position">The simplest, but after an update ticks land on the wrong items.</spec-option>
+      <p class="why">Recommended option accepted. A tick survives <code>briefing update</code>, because the key does not depend on the position in the list.</p>
+    </spec-decision>
+
+    <spec-decision did="D5" round="1" from="Q5" topic="Storage">
+      <p class="q">Do ticks go back to Notion?</p>
+      <spec-option value="A" label="No, local only" recommended>The checkboxes are a handy list for today. Statuses in Notion are changed as before.</spec-option>
+      <spec-option value="B" label="A &quot;Copy done&quot; button" chosen>The page builds a prompt <code>/daily-workflow:briefing done …</code> with the ticked Notion cards, you paste it into the session and the skill sets Done (today). More work: a new skill mode.</spec-option>
+      <p class="why">Ticks go back to Notion through a prompt pasted into the session; details in <a href="#D7">D7</a>–<a href="#D10">D10</a>.</p>
+    </spec-decision>
+
+    <spec-decision did="D6" round="1" from="Q6" topic="Technique">
+      <p class="q">Where does the checkbox script live?</p>
+      <spec-option value="A" label="Inline in the page" recommended>A small script in <code>&lt;script&gt;</code> next to the CSS in <code>plan.py</code>. The page stays one file, old plans get it too after a re-render.</spec-option>
+      <spec-option value="B" label="Assets like the Inbox" chosen>A JS file in the plugin, copied to <code>plans/assets/</code> on render. Consistent with the Inbox, but the page is now several files.</spec-option>
+      <p class="note">(if you need to do something complicated and it makes the code easier, you can also use https://alpinejs.dev/)</p>
+      <p class="why">The script and the style are plugin assets copied on render, like the Inbox. Alpine.js is not needed: checkboxes, localStorage and building the prompt are a few dozen lines of plain JS in light DOM (like <code>inbox-components.js</code>), without a dependency that would have to sit locally in the assets for <code>file://</code>.</p>
+    </spec-decision>
+
+    <spec-decision did="D7" round="2" from="Q7" topic="Copy done">
+      <p class="q">What goes into the "Copy done" prompt?</p>
+      <spec-option value="A" label="Only items with a Notion card" recommended>Ticked items whose link leads to a Notion card (tasks, Deep Work, Follow-ups). The skill sets their Status to <code>Done (today)</code>. Reviews, PRs, the agenda and the information sections are ticked off only locally.</spec-option>
+      <spec-option value="B" label="Every ticked item" chosen>The prompt holds every ticked item; the skill changes the Notion cards and only lists the rest in the answer. A longer prompt with no extra effect.</spec-option>
+      <p class="why">Every ticked item goes into the prompt: Notion cards get Done (today), the rest is listed in the answer and, per <a href="#D9">D9</a>, marked done in the plan JSON.</p>
+    </spec-decision>
+
+    <spec-decision did="D8" round="2" from="Q8" topic="Copy done">
+      <p class="q">Is the pasted prompt enough consent to change Notion?</p>
+      <spec-option value="A" label="Yes, like apply in the Inbox" recommended chosen>Ticking and pasting is the consent; the skill sets Done (today) without asking and answers with a short summary.</spec-option>
+      <spec-option value="B" label="The skill asks again">Shows the list of changes and waits for "yes", like the changes in the morning briefing. Safer, one more step.</spec-option>
+      <p class="why">Recommended option accepted. The same consent model as the Inbox apply.</p>
+    </spec-decision>
+
+    <spec-decision did="D9" round="2" from="Q9" topic="Copy done" amended-by="D11">
+      <p class="q">After "done", does the plan remember ticks outside localStorage too?</p>
+      <spec-option value="A" label="Yes, in the plan JSON" recommended chosen>The skill writes <code>done: true</code> to the items in <code>plans/&lt;date&gt;.json</code> and renders the page again. The items are ticked in another browser too and after localStorage is cleared.</spec-option>
+      <spec-option value="B" label="No, localStorage only">The plan JSON does not change. Simpler, but the state lives in one browser only.</spec-option>
+      <p class="why">Recommended option accepted. The JSON stays the source of truth for what was done.</p>
+    </spec-decision>
+
+    <spec-decision did="D10" round="2" from="Q10" topic="Look">
+      <p class="q">Where is the "Copy done" button?</p>
+      <spec-option value="A" label="A bar at the bottom" recommended chosen>A sticky bar appears when at least one Notion card is ticked: "N done · Copy done". Like the shortcut bar in the Inbox.</spec-option>
+      <spec-option value="B" label="A section at the end of the page">A "Done today" section with the list and the button under Notion changes. Does not cover content, but needs scrolling.</spec-option>
+      <p class="why">Recommended option accepted. With <a href="#D7">D7</a> the bar appears when at least one item is ticked.</p>
+    </spec-decision>
+
+    <spec-decision did="D11" round="3" amends="D9" topic="Copy done">
+      <p class="q">How are plain-text items (agenda points, daily bullets) marked done in the plan JSON?</p>
+      <spec-option value="A" label="Their keys in a top-level done_items list" chosen>Plain strings cannot carry <code>done: true</code>, so <code>worklog plan-done</code> adds their keys to <code>done_items</code>; object items still get <code>done: true</code>.</spec-option>
+      <p class="why">Found during implementation: converting the strings to objects would change the plan schema the briefing writes. The rest of <a href="#D9">D9</a> stays.</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-24-briefing-plan-checkboxes.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>

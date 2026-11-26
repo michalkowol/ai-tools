@@ -325,6 +325,76 @@ class PlanTest(WorklogTestCase):
         self.assertNotIn("Resolved", page)
 
 
+class PlanChecksTest(WorklogTestCase):
+    run_cli = CliTest.run_cli
+
+    def plan_data(self):
+        return {
+            "date": "2026-11-26", "mode": "work",
+            "priorities": [{"title": "Task A", "url": "https://www.notion.so/a"},
+                           {"title": "Task \"B\" <x>", "source": {"label": "Jira", "url": "https://jira.test/PROJ-1"}}],
+            "deep_work": {"status": "scheduled", "task": "PROJ-1", "start": "11:00", "end": "13:00",
+                          "event_url": "https://calendar.google.com/e"},
+            "code_review": [{"title": "Batch", "repo": "org/shop", "number": 412, "url": "https://github.com/org/shop/pull/412"}],
+            "meetings": [{"start": "15:00", "end": "15:30", "title": "1:1 Alice", "agenda": ["Promotion plan"]}],
+            "daily_update": {"today": ["Ship it"]},
+            "notion_changes": [{"card": "Card", "change": "Reminder today", "status": "applied", "url": ""}],
+        }
+
+    def write_plan(self, data):
+        core.ensure_home()
+        path = core.plans_dir() / "2026-11-26.json"
+        path.write_text(json.dumps(data))
+        return path
+
+    def test_every_item_has_a_checkbox_with_a_stable_key(self):
+        path = self.write_plan(self.plan_data())
+        page = plan.render_file(path, "plans/2026-11-26.json").read_text()
+        for key in ("priorities|https://www.notion.so/a", "priorities|https://jira.test/PROJ-1",
+                    "deep_work|https://calendar.google.com/e", "code_review|https://github.com/org/shop/pull/412",
+                    "meetings|15:00 1:1 Alice", "agenda|15:00 1:1 Alice|Promotion plan", "daily_update.today|Ship it",
+                    "notion_changes|Card"):
+            self.assertIn(f'data-key="{key}"', page)
+        self.assertEqual(page.count('class="cbx"'), 8)
+        self.assertIn('data-label="Task &quot;B&quot; &lt;x&gt;"', page)
+        self.assertIn('<body data-file="plans/2026-11-26.json">', page)
+        self.assertIn('class="deep-box chk"', page)
+        self.assertNotIn("<style", page)
+        for name in plan.ASSETS:
+            self.assertEqual((core.plans_dir() / "assets" / name).read_bytes(), (plan.ASSETS_DIR / name).read_bytes())
+
+    def test_plan_done_marks_items_and_rerenders(self):
+        path = self.write_plan(self.plan_data())
+        lines = "\n".join([
+            "/daily-workflow:briefing done plans/2026-11-26.json",
+            json.dumps({"key": "priorities|https://www.notion.so/a", "label": "Task A"}),
+            json.dumps({"key": "agenda|15:00 1:1 Alice|Promotion plan", "label": "Promotion plan"}),
+            json.dumps({"key": "resolved|gone", "label": "Gone"}),
+        ])
+        out = self.run_cli("plan-done", "plans/2026-11-26.json", stdin=lines)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        result = json.loads(out.stdout)
+        self.assertEqual(result["done"][0], {"key": "priorities|https://www.notion.so/a", "label": "Task A",
+                                             "url": "https://www.notion.so/a"})
+        self.assertEqual(result["done"][1]["url"], "")
+        self.assertEqual(result["unknown"], ["resolved|gone"])
+        self.assertTrue(result["open"].startswith("open ") and result["open"].endswith("2026-11-26.html"))
+        data = json.loads(path.read_text())
+        self.assertTrue(data["priorities"][0]["done"])
+        self.assertNotIn("done", data["priorities"][1])
+        self.assertEqual(data["done_items"], ["agenda|15:00 1:1 Alice|Promotion plan"])
+        page = path.with_suffix(".html").read_text()
+        self.assertIn('class="chk done" data-key="priorities|https://www.notion.so/a"', page)
+        self.assertIn('data-key="agenda|15:00 1:1 Alice|Promotion plan" data-label="Promotion plan" data-done', page)
+
+    def test_keys_survive_reordering(self):
+        data = self.plan_data()
+        data["priorities"].reverse()
+        keys = [k for k, _ in plan.all_items(data)]
+        self.assertIn("priorities|https://www.notion.so/a", keys)
+        self.assertEqual(len(keys), len(set(keys)))
+
+
 class GithubEstimateTest(unittest.TestCase):
     def test_estimate_by_changed_files(self):
         cases = {1: "0.25 x 🍅", 3: "0.25 x 🍅", 4: "0.5 x 🍅", 9: "0.5 x 🍅", 10: "1 x 🍅", 19: "1 x 🍅",
@@ -495,16 +565,22 @@ class InboxTest(WorklogTestCase):
         self.assertIn('<inbox-app file="inbox/2026-11-23-1000.json" date="2026-11-23">\n</inbox-app>', page)
 
 
-class InboxLogicTest(unittest.TestCase):
-    """Runs the node tests of the page logic (assets/inbox-logic.js); skipped without node."""
+class PageLogicTest(unittest.TestCase):
+    """Runs the node tests of the page logic (assets/inbox-logic.js, assets/plan.js); skipped without node."""
 
-    def test_node_logic_tests(self):
+    def run_node(self, name):
         node = shutil.which("node")
         if not node:
             self.skipTest("node is not installed")
-        test_file = Path(__file__).resolve().parent / "inbox_logic.test.js"
+        test_file = Path(__file__).resolve().parent / name
         out = subprocess.run([node, "--test", str(test_file)], capture_output=True, text=True, check=False)
         self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+
+    def test_inbox_logic(self):
+        self.run_node("inbox_logic.test.js")
+
+    def test_plan_logic(self):
+        self.run_node("plan_logic.test.js")
 
 
 if __name__ == "__main__":

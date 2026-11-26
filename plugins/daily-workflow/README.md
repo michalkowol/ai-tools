@@ -35,12 +35,15 @@ The first hook creates `~/.ai/worklog` as a local git repo with `config.toml` fr
 | `/daily-workflow:briefing` | morning plan: catch-up of unsummarized sessions, sources, plan, `open …` command for the host |
 | `/daily-workflow:briefing update` | after the daily: reads `~/.ai/worklog/meetings/<date>*.txt`, corrects the plan, creates the Deep Work block |
 | `/daily-workflow:briefing home` | home tasks from Calendar and Notion, no work sources, no calendar block |
+| `/daily-workflow:briefing done …` | the prompt copied from the plan page: marks the ticked items done, Notion cards get Done (today) |
 | `/daily-workflow:inbox` | capture into the Notion Inbox, then the processing page with a proposal for every Inbox card |
 | `/daily-workflow:inbox process` | only the processing page, no capture |
 | `/daily-workflow:inbox apply …` | the prompt copied from the processing page: applies the answers to Notion |
 
 Drop the daily transcript into `~/.ai/worklog/meetings/` with the date in the name, e.g. `2026-11-23-daily.txt`.
-Open the plan on the host with the printed command, e.g. `open ~/.ai/worklog/plans/2026-11-23.html`.
+Open the plan on the host with the printed command, e.g. `open ~/.ai/worklog/plans/2026-11-23.html`. Every item has a
+checkbox; ticks are kept in the browser, and "Copy done" in the bottom bar copies a prompt that marks them done in the
+plan and in Notion.
 
 The inbox page works the same way (`open ~/.ai/worklog/inbox/2026-11-23-0930.html`). Each entry starts with the AI
 proposal; `j` / `→` accepts it and moves on, so only change what is wrong: click a field or the title, `e` Done,
@@ -58,6 +61,7 @@ Capture creates new Inbox cards without asking. Every other Notion change comes 
   entries/YYYY-MM/<session>.jsonl         Worklog Entries, one file per session
   days/YYYY-MM-DD.md                      generated day view
   plans/YYYY-MM-DD[-home].json|html       briefing plans
+  plans/assets/                           plan page style and script, copied on every render
   inbox/YYYY-MM-DD-HHMM.json|html          inbox processing pages
   inbox/assets/                           page components, copied from the plugin on every render
   state/inbox.json                        inbox cursor and 30-day registry of captured URLs
@@ -87,6 +91,6 @@ Every file has a single writer, so parallel sessions in separate containers neve
 python3 -m unittest discover -s plugins/daily-workflow/tests
 ```
 
-The unittest run also runs `tests/inbox_logic.test.js` with `node --test` (skipped without `node`). The page
-components live in `scripts/wl/assets/`: `inbox-logic.js` (pure logic, no DOM), `inbox-components.js` and
-`inbox.css`.
+The unittest run also runs `tests/inbox_logic.test.js` and `tests/plan_logic.test.js` with `node --test` (skipped
+without `node`). The page assets live in `scripts/wl/assets/`: `inbox-logic.js` (pure logic, no DOM),
+`inbox-components.js`, `inbox.css`, and `plan.js` / `plan.css` for the plan page.

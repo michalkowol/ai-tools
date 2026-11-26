@@ -1,38 +1,22 @@
 """Renders plans/YYYY-MM-DD[-home].json into a fixed HTML page.
 
 Every value is escaped and only http(s) links are kept: the plan holds text
-gathered from email, Slack and transcripts, which is data, never markup."""
+gathered from email, Slack and transcripts, which is data, never markup.
+
+Every item gets a checkbox with a stable key (section + URL, or the text when there is no URL), so ticks kept in
+localStorage by `assets/plan.js` survive a re-render. `mark_done` writes ticks pasted back from the page into the
+JSON: `done: true` on object items, the key in `done_items` for plain-text items."""
 from __future__ import annotations
 
 import html
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
-CSS = """
-:root{--bg:#FAF9F5;--wash:#F0EEE6;--ink:#141413;--body:#3D3D3A;--muted:#87867F;--line:#D1CFC5;
---clay:#D97757;--olive:#788C5D;--serif:Georgia,"Times New Roman",serif;
---sans:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;--mono:ui-monospace,Menlo,monospace}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--body);font:15px/1.55 var(--sans)}
-main{max-width:860px;margin:0 auto;padding:40px 24px 80px}
-.top{background:var(--wash);border-bottom:1px solid var(--line)}
-.eyebrow{font:12px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-h1{font:600 34px/1.2 var(--serif);color:var(--ink);margin:6px 0 20px}
-h2{font:600 18px var(--sans);color:var(--ink);margin:36px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
-.acts{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
-.act{padding:0 16px;border-left:1px solid var(--line)}.act:first-child{border-left:0;padding-left:0}
-.act b{display:block;color:var(--ink)}
-ol,ul{padding-left:22px;margin:6px 0}li{margin:8px 0}
-li::marker{color:var(--muted)}
-.t{font-weight:600;color:var(--ink)}
-.k{display:inline-block;font:11px var(--mono);padding:1px 7px;border-radius:9px;background:#E3DACC;color:var(--ink);margin-right:6px}
-.k.deep{background:var(--clay);color:#fff}.k.ok{background:var(--olive);color:#fff}
-.src a,.src{color:var(--muted)}a{color:var(--body)}
-.note{color:var(--muted);font-size:13px}
-.deep-box{border-left:3px solid var(--clay);padding:8px 14px;background:#fff}
-code{font:13px var(--mono);background:var(--wash);padding:1px 5px;border-radius:4px}
-@media(max-width:640px){.acts{grid-template-columns:1fr}.act{border-left:0;border-top:1px solid var(--line);padding:8px 0}h1{font-size:27px}}
-"""
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
+ASSETS = ("plan.css", "plan.js")
+PAGE_FORMAT = "1"
 
 KIND_LABEL = {"deep": "deep focus", "heavy": "heavy", "light": "light"}
 
@@ -64,16 +48,58 @@ def note(r: dict[str, Any], tag: str = "span") -> str:
     return f' <{tag} class="note">{e(r.get("note"))}</{tag}>' if r.get("note") else ""
 
 
-def items(rows: list[dict[str, Any]], render) -> str:
-    rows = [r for r in rows or [] if r]
-    if not rows:
-        return ""
-    return "<ol>" + "".join(f"<li>{render(r)}</li>" for r in rows) + "</ol>"
+def item_url(r: dict[str, Any]) -> str:
+    src = r.get("source") if isinstance(r.get("source"), dict) else {}
+    return safe_url(r.get("url")) or safe_url(src.get("url")) or safe_url(r.get("event_url")) or ""
 
 
-def bullets(values: list[Any]) -> str:
-    values = [v for v in values or [] if v]
-    return "<ul>" + "".join(f"<li>{e(v)}</li>" for v in values) + "</ul>" if values else ""
+def item_label(r: Any) -> str:
+    if not isinstance(r, dict):
+        return str(r)
+    if r.get("repo") and r.get("number"):
+        return f"{r['repo']}#{r['number']} {r.get('title') or ''}".strip()
+    if r.get("start") and r.get("title"):
+        return f"{r['start']} {r['title']}"
+    return str(r.get("title") or r.get("card") or r.get("task") or "")
+
+
+def item_key(section: str, r: Any) -> str:
+    if not isinstance(r, dict):
+        return f"{section}|{r}"
+    return f"{section}|{item_url(r) or item_label(r)}"
+
+
+class Checks:
+    """Builds the checkbox markup and knows which keys the JSON already marks as done."""
+
+    def __init__(self, plan: dict[str, Any]):
+        self.done_items = set(plan.get("done_items") or [])
+
+    def attrs(self, section: str, r: Any) -> str:
+        key = item_key(section, r)
+        done = (r.get("done") if isinstance(r, dict) else False) or key in self.done_items
+        url = item_url(r) if isinstance(r, dict) else ""
+        out = f' class="chk{" done" if done else ""}" data-key="{e(key)}" data-label="{e(item_label(r))}"'
+        if url:
+            out += f' data-url="{e(url)}"'
+        return out + (" data-done" if done else "")
+
+    def body(self, content: str, after: str = "") -> str:
+        return f'<input type="checkbox" class="cbx" aria-label="Done"><div class="cbody">{content}</div>{after}'
+
+    def items(self, section: str, rows: list[dict[str, Any]], render, after=None) -> str:
+        rows = [r for r in rows or [] if r]
+        if not rows:
+            return ""
+        return "<ol>" + "".join(
+            f"<li{self.attrs(section, r)}>{self.body(render(r), after(r) if after else '')}</li>" for r in rows
+        ) + "</ol>"
+
+    def bullets(self, section: str, values: list[Any]) -> str:
+        values = [v for v in values or [] if v]
+        if not values:
+            return ""
+        return "<ul>" + "".join(f"<li{self.attrs(section, v)}>{self.body(e(v))}</li>" for v in values) + "</ul>"
 
 
 def section(title: str, body: str) -> str:
@@ -86,9 +112,11 @@ def titled(r: dict[str, Any]) -> str:
     return f'<span class="t">{title}</span>{text}{source(r.get("source"))}'
 
 
-def render(plan: dict[str, Any]) -> str:
+def render(plan: dict[str, Any], file_label: str = "") -> str:
     mode = plan.get("mode") or "work"
     stage = plan.get("stage") or "morning"
+    checks = Checks(plan)
+    items, bullets = checks.items, checks.bullets
     out: list[str] = []
 
     eyebrow = " · ".join(
@@ -112,12 +140,14 @@ def render(plan: dict[str, Any]) -> str:
         label = {"scheduled": "scheduled in the calendar", "proposed": "proposed, created after the daily",
                  "none": "no window today"}.get(status, status)
         cls = "ok" if status == "scheduled" else "deep"
-        out.append(section("Deep Work", (
-            f'<div class="deep-box"><span class="k {cls}">{e(label)}</span>'
+        content = (
+            f'<span class="k {cls}">{e(label)}</span>'
             f'<span class="t">{e(dw.get("task"))}</span> {e(when)}'
             f"{note(dw, 'div')}"
-            f"{(' ' + link('event', dw.get('event_url'))) if safe_url(dw.get('event_url')) else ''}</div>"
-        )))
+            f"{(' ' + link('event', dw.get('event_url'))) if safe_url(dw.get('event_url')) else ''}"
+        )
+        attrs = checks.attrs("deep_work", dw).replace(' class="chk', ' class="deep-box chk', 1)
+        out.append(section("Deep Work", f"<div{attrs}>{checks.body(content)}</div>"))
 
     def priority(r: dict[str, Any]) -> str:
         kind = r.get("kind") or ""
@@ -126,9 +156,9 @@ def render(plan: dict[str, Any]) -> str:
         why = f'<div class="note">{e(r.get("why"))}</div>' if r.get("why") else ""
         return f"{badge}{titled(r)}{est}{why}"
 
-    out.append(section("Today's tasks", items(plan.get("priorities"), priority)))
+    out.append(section("Today's tasks", items("priorities", plan.get("priorities"), priority)))
     out.append(section("Outside the limit", items(
-        plan.get("outside_limit"),
+        "outside_limit", plan.get("outside_limit"),
         lambda r: f'<span class="k">{e(r.get("kind"))}</span>{titled(r)}{note(r)}',
     )))
 
@@ -137,23 +167,25 @@ def render(plan: dict[str, Any]) -> str:
         meta = " · ".join(x for x in (r.get("author"), r.get("waiting")) if x)
         return f'<span class="t">{head}</span> <span class="note">{e(meta)}</span><div>{e(r.get("reason"))}</div>'
 
-    out.append(section("Code review order", items(plan.get("code_review"), review)))
+    out.append(section("Code review order", items("code_review", plan.get("code_review"), review)))
     out.append(section("My pull requests", items(
-        plan.get("my_prs"),
+        "my_prs", plan.get("my_prs"),
         lambda r: f'<span class="k">{e(r.get("state"))}</span>'
         f'<span class="t">{link(r.get("title"), r.get("url"))}</span>{note(r)}',
     )))
-    out.append(section("Needs attention", items(plan.get("needs_attention"), titled)))
+    out.append(section("Needs attention", items("needs_attention", plan.get("needs_attention"), titled)))
 
     def meeting(r: dict[str, Any]) -> str:
-        agenda = bullets(r.get("agenda"))
-        return f'<span class="t">{e(r.get("start"))}–{e(r.get("end"))} {e(r.get("title"))}</span>{note(r)}{agenda}'
+        return f'<span class="t">{e(r.get("start"))}–{e(r.get("end"))} {e(r.get("title"))}</span>{note(r)}'
 
-    out.append(section("Meetings", items(plan.get("meetings"), meeting)))
+    out.append(section("Meetings", items(
+        "meetings", plan.get("meetings"), meeting,
+        after=lambda r: bullets(f"agenda|{item_label(r)}", r.get("agenda")),
+    )))
 
     daily = plan.get("daily_update") or {}
     daily_body = "".join(
-        f"<p class=t>{e(label)}</p>{bullets(daily.get(key))}"
+        f"<p class=t>{e(label)}</p>{bullets(f'daily_update.{key}', daily.get(key))}"
         for label, key in (("Yesterday", "yesterday"), ("Today", "today"), ("Blockers", "blockers"))
         if daily.get(key)
     )
@@ -161,19 +193,16 @@ def render(plan: dict[str, Any]) -> str:
 
     post = plan.get("post_daily") or {}
     post_body = "".join(
-        f"<p class=t>{e(label)}</p>{bullets(post.get(key))}"
-        for label, key in (
-            ("Plan changes", "plan_changes"), ("Team blockers", "team_blockers"),
-            ("Who needs help", "needs_help"), ("Agreed", "agreed"), ("Decisions", "decisions"),
-        )
+        f"<p class=t>{e(label)}</p>{bullets(f'post_daily.{key}', post.get(key))}"
+        for label, key in POST_DAILY
         if post.get(key)
     )
     out.append(section("After the daily", post_body))
-    out.append(section("Prep for tomorrow", items(plan.get("tomorrow_prep"), titled)))
-    out.append(section("Follow-ups", items(plan.get("follow_ups"), titled)))
-    out.append(section("Resolved", items(plan.get("resolved"), titled)))
+    out.append(section("Prep for tomorrow", items("tomorrow_prep", plan.get("tomorrow_prep"), titled)))
+    out.append(section("Follow-ups", items("follow_ups", plan.get("follow_ups"), titled)))
+    out.append(section("Resolved", items("resolved", plan.get("resolved"), titled)))
     out.append(section("Notion changes", items(
-        plan.get("notion_changes"),
+        "notion_changes", plan.get("notion_changes"),
         lambda r: f'<span class="k {"ok" if r.get("status") == "applied" else ""}">{e(r.get("status"))}</span>'
         f'<span class="t">{link(r.get("card"), r.get("url"))}</span> {e(r.get("change"))}',
     )))
@@ -190,16 +219,79 @@ def render(plan: dict[str, Any]) -> str:
     return (
         "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-        f"<title>{e(title)}</title><style>{CSS}</style></head><body>"
+        f"<meta name=\"daily-workflow-plan\" content=\"{PAGE_FORMAT}\">"
+        f"<title>{e(title)}</title>"
+        "<link rel=\"stylesheet\" href=\"assets/plan.css\">"
+        "<script defer src=\"assets/plan.js\"></script></head>"
+        f"<body data-file=\"{e(file_label)}\">"
         + "".join(out)
         + "</body></html>\n"
     )
 
 
-def render_file(json_path: Path) -> Path:
+POST_DAILY = (
+    ("Plan changes", "plan_changes"), ("Team blockers", "team_blockers"),
+    ("Who needs help", "needs_help"), ("Agreed", "agreed"), ("Decisions", "decisions"),
+)
+LIST_SECTIONS = ("priorities", "outside_limit", "code_review", "my_prs", "needs_attention", "meetings",
+                 "tomorrow_prep", "follow_ups", "resolved", "notion_changes")
+
+
+def all_items(plan: dict[str, Any]):
+    """Every checkable item as (key, item); the same keys the page uses."""
+    dw = plan.get("deep_work")
+    if isinstance(dw, dict) and dw:
+        yield item_key("deep_work", dw), dw
+    for name in LIST_SECTIONS:
+        for r in plan.get(name) or []:
+            if not r:
+                continue
+            yield item_key(name, r), r
+            if name == "meetings" and isinstance(r, dict):
+                for a in r.get("agenda") or []:
+                    if a:
+                        yield item_key(f"agenda|{item_label(r)}", a), a
+    for group, keys in (("daily_update", ("yesterday", "today", "blockers")),
+                        ("post_daily", tuple(k for _, k in POST_DAILY))):
+        for key in keys:
+            for v in (plan.get(group) or {}).get(key) or []:
+                if v:
+                    yield item_key(f"{group}.{key}", v), v
+
+
+def mark_done(plan: dict[str, Any], keys: list[str]) -> dict[str, Any]:
+    """Marks the ticked items done in the plan. Returns the matched items (with their URL, so the caller can update
+    Notion cards) and the unknown keys."""
+    wanted = list(dict.fromkeys(keys))
+    found: dict[str, dict[str, Any]] = {}
+    done_items = list(plan.get("done_items") or [])
+    for key, r in all_items(plan):
+        if key not in wanted or key in found:
+            continue
+        if isinstance(r, dict):
+            r["done"] = True
+        elif key not in done_items:
+            done_items.append(key)
+        found[key] = {"key": key, "label": item_label(r), "url": item_url(r) if isinstance(r, dict) else ""}
+    if done_items:
+        plan["done_items"] = done_items
+    return {"done": [found[k] for k in wanted if k in found], "unknown": [k for k in wanted if k not in found]}
+
+
+def copy_assets(names: tuple[str, ...], target: Path) -> None:
+    """Pages link their assets relatively; overwrite them on every render so every page gets the current version."""
+    target.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        tmp = target / f".{name}.tmp"
+        shutil.copyfile(ASSETS_DIR / name, tmp)
+        tmp.replace(target / name)
+
+
+def render_file(json_path: Path, file_label: str = "") -> Path:
     plan = json.loads(json_path.read_text(encoding="utf-8"))
+    copy_assets(ASSETS, json_path.parent / "assets")
     html_path = json_path.with_suffix(".html")
     tmp = html_path.with_name(f".{html_path.name}.tmp")
-    tmp.write_text(render(plan), encoding="utf-8")
+    tmp.write_text(render(plan, file_label or f"plans/{json_path.name}"), encoding="utf-8")
     tmp.replace(html_path)
     return html_path

@@ -8,6 +8,7 @@ Usage (the most common ones):
   worklog.py context                      # Worklog context for the briefing (JSON)
   worklog.py github                       # pull request data for the briefing (JSON)
   worklog.py render-plan plans/2026-11-23.json
+  worklog.py plan-done plans/2026-11-23.json < pasted-lines   # ticks from the plan page
   worklog.py inbox start|check|record       # inbox capture state (JSON)
   worklog.py render-inbox inbox/2026-11-23-0930.json
 """
@@ -151,12 +152,44 @@ def cmd_github(args) -> int:
     return 0
 
 
-def cmd_render_plan(args) -> int:
-    path = Path(args.path)
+def plan_path(arg: str) -> tuple[Path, str]:
+    path = Path(arg)
     if not path.is_absolute() and not path.exists():
         path = core.home() / path
-    html_path = plan.render_file(path)
+    path = path.resolve()
+    try:
+        label = str(path.relative_to(core.home().resolve()))
+    except ValueError:
+        label = str(path)
+    return path, label
+
+
+def cmd_render_plan(args) -> int:
+    path, label = plan_path(args.path)
+    html_path = plan.render_file(path, label)
     print(f"open {host_path(html_path)}")
+    return 0
+
+
+def cmd_plan_done(args) -> int:
+    """Lines pasted from the plan page ("Copy done") on stdin: mark them done in the JSON and re-render."""
+    path, label = plan_path(args.path)
+    keys = []
+    for line in sys.stdin.read().splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            key = json.loads(line).get("key")
+        except (json.JSONDecodeError, AttributeError):
+            continue
+        if key:
+            keys.append(str(key))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    result = plan.mark_done(data, keys)
+    core.write_json_atomic(path, data)
+    result["open"] = f"open {host_path(plan.render_file(path, label))}"
+    dump(result)
     return 0
 
 
@@ -270,6 +303,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("render-plan", help="render a plan JSON into HTML")
     p.add_argument("path")
     p.set_defaults(func=cmd_render_plan)
+
+    p = sub.add_parser("plan-done", help="mark items ticked on the plan page as done (prompt lines on stdin)")
+    p.add_argument("path")
+    p.set_defaults(func=cmd_plan_done)
 
     p = sub.add_parser("inbox", help="inbox capture state: window, duplicate check, record")
     p.add_argument("action", choices=("start", "check", "record"))

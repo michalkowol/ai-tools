@@ -1,6 +1,6 @@
 {
   "name": "html-spec",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sets up a project for planning in HTML specs: html-spec and html-spec-extract skills, shared style and components, docs index",
   "author": {
     "name": "Michał Kowol",

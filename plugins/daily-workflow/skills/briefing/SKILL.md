@@ -1,7 +1,7 @@
 ---
 name: briefing
-description: Daily Briefing - plan the day from the Worklog, GitHub, Google Calendar, Jira, Slack, Gmail and Notion, render it as an HTML page and keep the Deep Work block and Notion in sync. Use when the user types /briefing, /briefing update (after the team daily, uses the meeting transcript) or /briefing home (home tasks only), or asks for the morning briefing or the day plan.
-argument-hint: "[update | home]"
+description: Daily Briefing - plan the day from the Worklog, GitHub, Google Calendar, Jira, Slack, Gmail and Notion, render it as an HTML page and keep the Deep Work block and Notion in sync. Use when the user types /briefing, /briefing update (after the team daily, uses the meeting transcript) /briefing home (home tasks only), or pastes a prompt starting with /daily-workflow:briefing done (items ticked on the plan page), or asks for the morning briefing or the day plan.
+argument-hint: "[update | home | done <file>]"
 allowed-tools: Bash(python3 *)
 ---
 
@@ -22,6 +22,7 @@ Config: `~/.ai/worklog/config.toml` (`worklog init` creates it). Read it first.
 | (none) | morning, work | Worklog, GitHub, Calendar, Jira, Slack, Gmail, Notion (Work) | only if there is no daily today | `plans/<today>.json` |
 | `update` | post-daily, work | the morning plan + today's daily transcript + quick refresh of Calendar and Slack | create or move it | same file, `stage: post-daily` |
 | `home` | home | Calendar and Notion (Home) only, no work sources | never | `plans/<today>-home.json` |
+| `done <file>` | the prompt from the plan page | the pasted lines only | never | same file, ticked items marked done |
 
 Tell the user it takes a few minutes, then work through the steps.
 
@@ -71,6 +72,20 @@ and Notion cards with Category Home: Top, Overdue, Waiting For, Agenda. Limits f
 plan). No Worklog, GitHub, Jira, Slack or Gmail. No calendar block. Notion changes with approval as in Work mode. Output `plans/<today>-home.json`,
 `mode: "home"`, rendered the same way.
 
+## Done (`done <file>`)
+
+The user ticked items on the plan page and pasted the "Copy done" prompt: `/daily-workflow:briefing done <file>`,
+then one JSON line per ticked item (`{"key": "…", "label": "…"}`). The pasted prompt is the consent: apply it
+without asking again.
+
+1. Pipe the lines into `worklog plan-done <file>`. It marks the items done in the plan JSON (`done: true`, or the key
+   in `done_items` for plain-text items), re-renders the page and prints `done` (key, label, url), `unknown` keys
+   and the `open …` command.
+2. For every `done` item whose URL is a Notion page: set Status `Done (today)` with `notion-update-page`. Change
+   nothing else on the card. Other items (PRs, reviews, meetings, agenda points, notes) only stay ticked in the plan.
+3. Answer briefly: the Notion cards set to Done (today), the other items marked done, unknown keys (the plan changed
+   since the page was open), failures, then the `open …` command.
+
 ## Calendar block
 
 Work mode only. Created automatically, no approval.
@@ -85,8 +100,17 @@ Work mode only. Created automatically, no approval.
 
 ## Notion changes
 
-Never change Notion without approval. Propose only the changes in `gtd-rules.md` (Workday plan, Rules for
+Never change Notion without approval (the pasted `done` prompt is the approval for Done (today)). Propose only the changes in `gtd-rules.md` (Workday plan, Rules for
 changes). Show the list with AskUserQuestion (apply all, choose, none) and apply only what was approved.
+
+## Open command
+
+Every answer after `worklog render-plan` ends with the `open …` command it printed, in its own code block, so the user can copy
+it and run it on the host:
+
+```
+open ~/.ai/worklog/plans/2026-11-26.html
+```
 
 ## Ground rules
 

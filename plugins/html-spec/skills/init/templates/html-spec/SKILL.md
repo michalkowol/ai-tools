@@ -28,6 +28,14 @@ This skill was installed into the project by `/html-spec:init` from [michalkowol
 
 Do not edit this skill in the project, change it in ai-tools and re-run the init.
 
+## Open command
+
+Every answer that points the user to a spec (a new draft, the next round, the finalized spec) ends with the command that opens it, in its own code block, with the path relative to the repo root:
+
+```
+open .agents/docs/specs/YYYY-MM-DD-short-name.html
+```
+
 ## Workflow
 
 ### 0. Gather facts and pick the path
@@ -45,7 +53,7 @@ Then build the decision tree and count the decisions:
 2. Create the spec from `template.html` straight away with `status="decided"`, in English: Context, Facts and Out of scope filled in, no Open questions section, Prompt at the end (final order).
 3. Record every answer as a `<spec-decision>` exactly as in step 2 below: all options with `chosen` on the picked ones, the user's note translated to English, the rationale.
 4. Add the row to `.agents/docs/INDEX.md` with status `decided`.
-5. Give the user the implementation prompt (the same text the `<spec-prompt>` generates).
+5. Give the user the implementation prompt (the same text the `<spec-prompt>` generates) and end with the open command.
 
 If an answer opens new questions and the total goes above 2, switch to the draft workflow: create the spec as `draft`, record the decisions made so far and put the new questions into Open questions.
 
@@ -56,7 +64,7 @@ If an answer opens new questions and the total goes above 2, switch to the draft
 3. Fill in `<spec-header status="draft">`, Context, Facts (each with its source) and Out of scope.
 4. Write round 1 into Open questions (rules below).
 5. Add a row to `.agents/docs/INDEX.md` with status `draft`.
-6. Tell the user the file path and ask them to open it, answer, and paste the prompt from the Prompt section under the questions.
+6. Tell the user the file path and ask them to open it, answer, and paste the prompt from the Prompt section under the questions. End with the open command.
 
 ### 2. Process a round
 
@@ -90,7 +98,7 @@ The user pastes a prompt that starts with `/html-spec Round N answers for <file>
 
    Every `Qn` leaves a trace in the Decision log, nothing disappears.
 5. Move new facts to Facts. Move things the user excluded to Out of scope.
-6. If the answers open new questions, write the next round. Otherwise finalize.
+6. If the answers open new questions, write the next round and end the answer with the open command. Otherwise finalize.
 
 ### 3. Finalize
 
@@ -100,7 +108,7 @@ When no open questions are left:
 2. Remove the empty Open questions section and move the Prompt section to the end, so the page starts with Context.
 3. Find the decisions that need work outside this implementation (another team, a separate task, something that takes long). Ask the user for a ticket key or a link for each of them and set `ticket` on the decision. If the user asks, create the tickets (e.g. through Jira MCP). The spec is not a task tracker: it holds no tasks, owners or progress, only the reference to where the work is tracked.
 4. Set `status="decided"` in `<spec-header>` and in `INDEX.md`.
-5. The `<spec-prompt>` switches to the implementation prompt by itself. Tell the user to copy it into a new session or this one.
+5. The `<spec-prompt>` switches to the implementation prompt by itself. Tell the user to copy it into a new session or this one, and end with the open command.
 
 ### 4. After implementation
 

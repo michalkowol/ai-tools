@@ -1,0 +1,46 @@
+/*
+ * daily-workflow plan page: style.
+ * Plan page format 1
+ *
+ * Copied into ~/.ai/worklog/plans/assets/ by `worklog render-plan` on every render. Do not edit the copy.
+ */
+:root{--bg:#FAF9F5;--wash:#F0EEE6;--ink:#141413;--body:#3D3D3A;--muted:#87867F;--line:#D1CFC5;
+--clay:#D97757;--olive:#788C5D;--serif:Georgia,"Times New Roman",serif;
+--sans:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;--mono:ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--body);font:15px/1.55 var(--sans)}
+main{max-width:860px;margin:0 auto;padding:40px 24px 80px}
+.top{background:var(--wash);border-bottom:1px solid var(--line)}
+.eyebrow{font:12px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+h1{font:600 34px/1.2 var(--serif);color:var(--ink);margin:6px 0 20px}
+h2{font:600 18px var(--sans);color:var(--ink);margin:36px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.acts{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+.act{padding:0 16px;border-left:1px solid var(--line)}.act:first-child{border-left:0;padding-left:0}
+.act b{display:block;color:var(--ink)}
+ol,ul{padding-left:22px;margin:6px 0}li{margin:8px 0}
+li::marker{color:var(--muted)}
+.t{font-weight:600;color:var(--ink)}
+.k{display:inline-block;font:11px var(--mono);padding:1px 7px;border-radius:9px;background:#E3DACC;color:var(--ink);margin-right:6px}
+.k.deep{background:var(--clay);color:#fff}.k.ok{background:var(--olive);color:#fff}
+.src a,.src{color:var(--muted)}a{color:var(--body)}
+.note{color:var(--muted);font-size:13px}
+.deep-box{border-left:3px solid var(--clay);padding:8px 14px;background:#fff}
+code{font:13px var(--mono);background:var(--wash);padding:1px 5px;border-radius:4px}
+@media(max-width:640px){.acts{grid-template-columns:1fr}.act{border-left:0;border-top:1px solid var(--line);padding:8px 0}h1{font-size:27px}}
+main{padding-bottom:110px}
+
+/* checkboxes: every item; a ticked item is struck through and grayed, it stays in place */
+li.chk{position:relative}
+.cbx{margin:0 8px 0 0;vertical-align:-2px;accent-color:var(--olive);cursor:pointer}
+.cbody{display:inline}
+.chk.done>.cbody,.chk.done>.cbody .t,.chk.done>.cbody a{color:var(--muted);text-decoration:line-through}
+.chk.done>.cbody .k{opacity:.5}
+.chk[data-done]>.cbx{cursor:default}
+.deep-box .cbody{display:inline}
+
+/* bottom bar: ticks not sent yet */
+.bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:12px 24px;
+display:none;justify-content:center;align-items:center;gap:14px}
+.bar.on{display:flex}
+.bar button{font:14px var(--sans);padding:7px 14px;border-radius:10px;border:1px solid var(--clay);background:var(--clay);
+color:#fff;cursor:pointer}
+.bar .ok{color:var(--olive);font-size:13px}
