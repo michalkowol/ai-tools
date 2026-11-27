@@ -296,6 +296,18 @@
       }, options.map(([v, label]) => h('option', { value: v, selected: v === current }, label)));
     }
 
+    // The browser calendar, past dates allowed; × clears the date.
+    dateField(j, field, label) {
+      const card = this.S.cards[this.S.cur][j];
+      const base = this.entries[this.S.cur].cards[j];
+      const mod = L.fieldChanged(base, card, field) ? ' mod' : '';
+      const set = (v) => { this.setField(j, field, v); this.render(); };
+      return h('span', { class: `chip date${mod}${card[field] ? '' : ' empty'}`, title: card[field] ? L.formatDate(card[field], this.today) : `no ${label}` },
+        h('span', { class: 'dl' }, label),
+        h('input', { type: 'date', value: card[field], 'aria-label': label, onchange: (e) => set(e.target.value) }),
+        card[field] ? h('button', { type: 'button', class: 'dx', title: `Clear the ${label}`, onclick: () => set('') }, '×') : null);
+    }
+
     renderFields(j) {
       const c = this.S.cards[this.S.cur][j];
       const f = L.FIELDS[c.outcome];
@@ -303,8 +315,8 @@
       if (f.includes('category')) out.push(this.select(j, 'category', L.categoryLabel(c.category), Object.keys(L.CATEGORIES).map((k) => [k, k])));
       if (f.includes('estimate')) out.push(this.select(j, 'estimate', c.estimate, [['', 'no estimate'], ...L.ESTIMATES.map((v) => [v, v])]));
       if (f.includes('priority')) out.push(this.select(j, 'priority', c.priority, [['', 'no priority'], ...L.PRIORITIES.map((v) => [v, v])]));
-      if (f.includes('reminder')) out.push(this.select(j, 'reminder', c.reminder, L.dateOptions(c.reminder, 'reminder', this.today)));
-      if (f.includes('due')) out.push(this.select(j, 'due', c.due, L.dateOptions(c.due, 'due', this.today)));
+      if (f.includes('reminder')) out.push(this.dateField(j, 'reminder', 'reminder'));
+      if (f.includes('due')) out.push(this.dateField(j, 'due', 'due'));
       if (f.includes('agenda')) {
         const people = c.agenda && !this.people.includes(c.agenda) ? [...this.people, c.agenda] : this.people;
         out.push(this.select(j, 'agenda', c.agenda, [['', 'choose person'], ...people.map((p) => [p, '→ ' + p])]));

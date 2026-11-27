@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Inbox: calendar date picker, the Calendar status and Reminder equal to Due Date</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-27" status="implemented">
+    <h1>Inbox: calendar date picker, the Calendar status and Reminder equal to Due Date</h1>
+    <p>Three fixes to the Inbox page: no Reminder on the day of the Due Date; the Calendar status (plus Today and Today candidates) can be picked; dates are picked from a calendar, past dates included.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>Three remarks from the user about the Inbox page of <code>/daily-workflow:inbox</code>:</p>
+    <ol>
+      <li>When the Due Date and the Reminder are on the same day, setting the Reminder makes no sense.</li>
+      <li>The Calendar status cannot be picked.</li>
+      <li>Dates should be picked from a calendar, past dates included.</li>
+    </ol>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <ul>
+      <li>Page statuses: <code>done</code>, <code>next</code>, <code>waiting</code>, <code>agenda</code>, <code>someday</code>, <code>icebox</code>, <code>trash</code>, <code>keep</code>; the fields per status are in <code>FIELDS</code>. <cite><code>plugins/daily-workflow/scripts/wl/assets/inbox-logic.js</code> <code>OUTCOMES</code>, <code>FIELDS</code></cite></li>
+      <li>Reminder and Due Date are a <code>&lt;select&gt;</code> from <code>dateOptions()</code>: the empty value, today and 14 days (Due Date: 30), plus the current value if it is outside the list. <cite><code>inbox-logic.js</code> <code>dateOptions</code>, <code>inbox-components.js</code> <code>renderFields</code></cite></li>
+      <li>Switching to Waiting for without a Reminder sets the Reminder to today + 3 days. <cite><code>inbox-logic.js</code> <code>setField</code></cite></li>
+      <li>AI rule: Reminder never in the past; Due Date only for a real deadline. <cite><code>skills/inbox/references/processing.md</code></cite></li>
+      <li>Apply: an empty <code>reminder</code> / <code>due</code> clears the date; a missing field stays unchanged. <cite><code>processing.md</code>, Apply</cite></li>
+      <li>Top view: Reminder ≤ today or Due Date ≤ tomorrow. <cite><code>skills/briefing/references/gtd-rules.md</code></cite></li>
+      <li>Calendar in Notion: "fixed appointments"; the briefing shows them outside the task limit. 11 cards: 9 with only a Reminder, 1 with only a Due Date, 1 with both dates, all with an Estimate, 4 with ♻️ Recurring. <cite><code>gtd-rules.md</code>; query on the GTD database, 2026-11-27</cite></li>
+      <li>In the last apply the user removed by hand the Reminder of a card where the AI had proposed Reminder = Due Date. <cite><code>~/.ai/worklog/inbox/2026-11-27-0639.json</code> and the pasted prompt</cite></li>
+      <li>The briefing saves the day plan as a Reminder on the day; Today candidates are "only for the current days". <cite><code>gtd-rules.md</code></cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Times in dates (a Reminder with a time).</li>
+      <li>The briefing plan page and the briefing rules.</li>
+      <li>The AI rule "Reminder never in the past" stays; past dates only when picked by hand.</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Dates">
+    <p class="q">What to do when the Reminder and the Due Date are on the same day?</p>
+    <spec-option value="A" label="AI does not propose it, the page and apply clear it" recommended>Rule in <code>processing.md</code>: with a Due Date and no earlier Reminder, the Reminder stays empty. On the page, picking a Due Date equal to the Reminder clears the Reminder (with a message), and apply skips a Reminder equal to the Due Date. It cannot be set by mistake.</spec-option>
+    <spec-option value="B" label="AI does not propose it, the page only warns">Rule in <code>processing.md</code>, and the page shows a warning for equal dates without changing the fields. The decision stays with the user.</spec-option>
+    <spec-option value="C" chosen label="Only a rule for the AI">Page and apply unchanged. The least code, but both dates can still be set to the same day by hand.</spec-option>
+    <p class="why">Only a rule in <code>processing.md</code>: with a Due Date the AI does not propose a Reminder on the same day. Page and apply unchanged; both dates can be set by hand.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Calendar">
+    <p class="q">Which fields does the Calendar status have on the page?</p>
+    <spec-option value="A" chosen label="Like Next Actions" recommended>Category, Estimate, Priority, Reminder, Due Date, Project. Matches the existing cards (Estimate and dates).</spec-option>
+    <spec-option value="B" label="Without Estimate and Priority">Category, Reminder, Due Date, Project, like Someday/Maybe. Simpler, but the existing cards have an Estimate.</spec-option>
+    <p class="why">Recommended option accepted: Calendar has the Next Actions fields (Category, Estimate, Priority, Reminder, Due Date, Project), like the existing cards.</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Calendar">
+    <p class="q">When does the AI propose Calendar instead of Next Actions?</p>
+    <spec-option value="A" chosen label="When it can only be done from a given day" recommended>A fixed date (a visit, an installation, signing a contract) or something that only makes sense from a date (check something in December). Reminder = that day, required: without a date the card stays Next Actions.</spec-option>
+    <spec-option value="B" label="Only meetings and visits with a date">Narrow: only events with a specific day. Everything else with a date stays Next Actions with a Reminder.</spec-option>
+    <spec-option value="C" label="The AI never proposes it">Calendar only by hand on the page.</spec-option>
+    <p class="why">Recommended option accepted: Calendar when something can only be done from a given day; Reminder = that day, without a date the card stays Next Actions.</p>
+    </spec-decision>
+
+    <spec-decision did="D4" round="1" from="Q4" topic="Date picker">
+    <p class="q">How to pick a date on the page?</p>
+    <spec-option value="A" label="Shortcut list + &quot;Pick date…&quot;" recommended>The list stays (today, tomorrow, next days), at the end "Pick date…" opens the browser calendar (<code>input type="date"</code>, no min, so past dates too). The quick picks stay, the calendar for the rest.</spec-option>
+    <spec-option value="B" chosen label="Only the browser calendar">A date field instead of the list, next to it an "×" button to clear. One mechanism, but "tomorrow" is always two clicks in the calendar.</spec-option>
+    <spec-option value="C" label="Own calendar popup">A popup with a month grid and "today", "tomorrow", "+1 week", "none" buttons. The most convenient and consistent with the page look, but the most code.</spec-option>
+    <p class="why">The browser date field replaces the list, with an "×" button to clear; no min, so past dates too.</p>
+    </spec-decision>
+
+    <spec-decision did="D5" round="1" from="Q5" topic="Calendar">
+    <p class="q">Add other missing statuses along the way?</p>
+    <spec-option value="A" chosen label="Only Calendar" recommended>The others are day planning states (briefing) or rare cases.</spec-option>
+    <spec-option value="B" label="Errands">Things to run around town.</spec-option>
+    <spec-option value="C" chosen label="Today">The card goes straight to today, bypassing the briefing.</spec-option>
+    <spec-option value="D" label="Projects">An entry that turns out to be a project.</spec-option>
+    <p class="note">Also Today Candidates</p>
+    <p class="why">Three statuses are added: Calendar, Today and (from the note) Today candidates. The "only" in option A does not exclude C and the note: A means Calendar here. Fields and AI proposals for Today and Today candidates in <a href="#D6">D6</a> and <a href="#D7">D7</a>.</p>
+    </spec-decision>
+
+    <spec-decision did="D6" round="2" from="Q6" topic="Today">
+    <p class="q">Which fields do Today and Today candidates have?</p>
+    <spec-option value="A" chosen label="Like Next Actions, Reminder = today" recommended>The Next Actions fields; picking the status without a Reminder sets the Reminder to today (as Waiting for sets +3 days). The card also shows up in the Top view.</spec-option>
+    <spec-option value="B" label="Like Next Actions, no automatic date">The same fields, Reminder only by hand. The status itself says "today", the date is not needed.</spec-option>
+    <p class="why">Recommended option accepted: the Next Actions fields, and picking Today or Today candidates without a Reminder sets it to today.</p>
+    </spec-decision>
+
+    <spec-decision did="D7" round="2" from="Q7" topic="Today">
+    <p class="q">Does the AI propose Today or Today candidates?</p>
+    <spec-option value="A" chosen label="No, only by hand" recommended>The briefing plans the day (limit of 4 tasks); the AI in the Inbox proposes Next Actions with a Reminder today, as now.</spec-option>
+    <spec-option value="B" label="Today candidates for urgent things today">When something blocks someone or is due today, the AI proposes Today candidates; the briefing picks from them.</spec-option>
+    <spec-option value="C" label="Today for urgent things today">The AI sets Today straight away, bypassing the briefing.</spec-option>
+    <p class="why">Recommended option accepted: Today and Today candidates only by hand on the page.</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-27-inbox-dates-and-calendar.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>

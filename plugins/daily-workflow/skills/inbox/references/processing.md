@@ -56,6 +56,9 @@ order in the file does not matter.
 |---|---|---|
 | `done` | takes under two minutes and the user can do it right now (a short reply, an approval) | Status `Done (today)` |
 | `next` | the user has to do it | Status `Next Actions`, Reminder on the planned day |
+| `calendar` | the user has to do it, but only on or from a given day (a fixed appointment, a visit, signing a contract, something that only makes sense from a date) | Status `Calendar`, Reminder = that day |
+| `today_candidates` | only picked by the user on the page, never proposed | Status `Today candidates` |
+| `today` | only picked by the user on the page, never proposed | Status `Today` |
 | `waiting` | the next step is someone else's | Status `Waiting for`, Reminder = the follow-up day |
 | `agenda` | a topic to raise with one person who has an Agenda card | append to that card, trash this one |
 | `someday` | maybe later, no commitment | Status `Someday/Maybe` |
@@ -81,7 +84,12 @@ order in the file does not matter.
 - Small review PR (someone else's PR waiting for the user's review, fewer than 10 files): propose `trash` with the
   reason "small PR, covered by the code review card". Own PRs (the user is the author) are never trashed by this rule.
 - Reminder: today for blocking items, otherwise the day it makes sense, never in the past. Due Date only for a real
-  deadline stated in the source.
+  deadline stated in the source. With a Due Date, never propose a Reminder on the same day (the Top view already
+  shows the card the day before the Due Date); leave it empty or pick an earlier day to start.
+- Calendar: propose `calendar` instead of `next` only when the action can only be done on or from a known day, and
+  set the Reminder to that day. Without such a day the card stays `next`.
+- Today and Today candidates: never propose them; the briefing plans the day. The page sets the Reminder to today
+  when the user picks one of them on a card without a Reminder.
 - Category: `Work` for captured entries; for entries added by hand judge from the content (`Home`, or both).
 - Project only from existing options, empty when nothing fits. The page shows it read-only; the user changes it
   through the note.
@@ -94,7 +102,7 @@ The page shows, and the apply line carries, only these fields (plus `title`, exc
 | Status | Fields |
 |---|---|
 | `done` | category, estimate, priority, reminder, due |
-| `next` | category, estimate, priority, reminder, due, project |
+| `next`, `calendar`, `today_candidates`, `today` | category, estimate, priority, reminder, due, project |
 | `waiting` | category, priority, reminder, due, project |
 | `agenda` | agenda |
 | `someday`, `icebox` | category, reminder, due, project |

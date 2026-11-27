@@ -61,18 +61,28 @@ test('category labels map to Notion values', () => {
   assert.equal(L.categoryLabel(['Home']), 'Home');
 });
 
-test('date options: no date first, 14 reminder days, 30 due days with prefix', () => {
-  const rem = L.dateOptions('', 'reminder', TODAY);
-  assert.deepEqual(rem[0], ['', 'no date']);
-  assert.deepEqual(rem[1], [TODAY, 'today Nov 23']);
-  assert.deepEqual(rem[2], ['2026-11-24', 'tomorrow Nov 24']);
-  assert.equal(rem.length, 16);
-  const due = L.dateOptions('', 'due', TODAY);
-  assert.deepEqual(due[0], ['', 'no due date']);
-  assert.equal(due.length, 32);
-  assert.ok(due.slice(1).every(([, label]) => label.startsWith('due ')));
-  assert.equal(L.dateOptions('2027-01-05', 'reminder', TODAY).at(-1)[0], '2027-01-05');
+test('dates from the calendar: past dates kept, anything but YYYY-MM-DD dropped', () => {
+  assert.equal(L.setField(card(), 'reminder', '2026-01-05', TODAY).reminder, '2026-01-05');
+  assert.equal(L.setField(card({ due: '2026-12-01' }), 'due', '', TODAY).due, '');
+  assert.equal(L.setField(card(), 'due', '5.12.2026', TODAY).due, '');
+  assert.equal(L.formatDate('2026-11-24', TODAY), 'tomorrow Nov 24');
   assert.equal(L.addDays('2026-12-30', 3), '2027-01-02');
+});
+
+test('Calendar, Today and Today candidates use the Next Actions fields', () => {
+  for (const outcome of ['calendar', 'today', 'today_candidates']) {
+    assert.deepEqual(L.FIELDS[outcome], L.FIELDS.next);
+    assert.deepEqual(Object.keys(parse(L.applyLine('p1', [card({ outcome })], ''))),
+      ['id', 'outcome', 'title', 'category', 'estimate', 'priority', 'reminder', 'due', 'project', 'note']);
+  }
+  assert.equal(L.OUTCOMES.today_candidates, 'Today candidates');
+});
+
+test('Today and Today candidates without a reminder get today, Calendar does not', () => {
+  assert.equal(L.setField(card({ reminder: '' }), 'outcome', 'today', TODAY).reminder, TODAY);
+  assert.equal(L.setField(card({ reminder: '' }), 'outcome', 'today_candidates', TODAY).reminder, TODAY);
+  assert.equal(L.setField(card({ reminder: '2026-11-30' }), 'outcome', 'today', TODAY).reminder, '2026-11-30');
+  assert.equal(L.setField(card({ reminder: '' }), 'outcome', 'calendar', TODAY).reminder, '');
 });
 
 test('prompt has the apply header and one line per non-Keep entry', () => {

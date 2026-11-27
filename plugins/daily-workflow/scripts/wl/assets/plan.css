@@ -1,46 +1,99 @@
 /*
  * daily-workflow plan page: style.
- * Plan page format 1
+ * Plan page format 2
  *
  * Copied into ~/.ai/worklog/plans/assets/ by `worklog render-plan` on every render. Do not edit the copy.
+ * Tokens copied from the html-spec style (Claude style), like inbox.css. No dark mode.
+ * Layout: a sticky left column with the header and the three acts of the day, the sections as white cards on the
+ * right; below 1100 px the column moves to the top.
  */
-:root{--bg:#FAF9F5;--wash:#F0EEE6;--ink:#141413;--body:#3D3D3A;--muted:#87867F;--line:#D1CFC5;
---clay:#D97757;--olive:#788C5D;--serif:Georgia,"Times New Roman",serif;
---sans:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;--mono:ui-monospace,Menlo,monospace}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--body);font:15px/1.55 var(--sans)}
-main{max-width:860px;margin:0 auto;padding:40px 24px 80px}
-.top{background:var(--wash);border-bottom:1px solid var(--line)}
-.eyebrow{font:12px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-h1{font:600 34px/1.2 var(--serif);color:var(--ink);margin:6px 0 20px}
-h2{font:600 18px var(--sans);color:var(--ink);margin:36px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
-.acts{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
-.act{padding:0 16px;border-left:1px solid var(--line)}.act:first-child{border-left:0;padding-left:0}
-.act b{display:block;color:var(--ink)}
-ol,ul{padding-left:22px;margin:6px 0}li{margin:8px 0}
-li::marker{color:var(--muted)}
-.t{font-weight:600;color:var(--ink)}
-.k{display:inline-block;font:11px var(--mono);padding:1px 7px;border-radius:9px;background:#E3DACC;color:var(--ink);margin-right:6px}
-.k.deep{background:var(--clay);color:#fff}.k.ok{background:var(--olive);color:#fff}
-.src a,.src{color:var(--muted)}a{color:var(--body)}
-.note{color:var(--muted);font-size:13px}
-.deep-box{border-left:3px solid var(--clay);padding:8px 14px;background:#fff}
-code{font:13px var(--mono);background:var(--wash);padding:1px 5px;border-radius:4px}
-@media(max-width:640px){.acts{grid-template-columns:1fr}.act{border-left:0;border-top:1px solid var(--line);padding:8px 0}h1{font-size:27px}}
-main{padding-bottom:110px}
 
-/* checkboxes: every item; a ticked item is struck through and grayed, it stays in place */
-li.chk{position:relative}
-.cbx{margin:0 8px 0 0;vertical-align:-2px;accent-color:var(--olive);cursor:pointer}
-.cbody{display:inline}
-.chk.done>.cbody,.chk.done>.cbody .t,.chk.done>.cbody a{color:var(--muted);text-decoration:line-through}
-.chk.done>.cbody .k{opacity:.5}
-.chk[data-done]>.cbx{cursor:default}
-.deep-box .cbody{display:inline}
+:root {
+  --ivory:    #FAF9F5;
+  --slate:    #141413;
+  --clay:     #D97757;
+  --oat:      #E3DACC;
+  --olive:    #788C5D;
+  --gray-150: #F0EEE6;
+  --gray-300: #D1CFC5;
+  --gray-500: #87867F;
+  --gray-700: #3D3D3A;
+  --white:    #FFFFFF;
+
+  --serif: ui-serif, Georgia, 'Times New Roman', serif;
+  --sans:  system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono:  ui-monospace, 'SF Mono', Menlo, Monaco, monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--sans); background: var(--ivory); color: var(--gray-700); line-height: 1.55; font-size: 15px;
+  -webkit-font-smoothing: antialiased; }
+a { color: var(--clay); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: var(--mono); font-size: 13px; background: var(--gray-150); padding: 1px 5px; border-radius: 4px; }
+
+/* layout */
+plan-page { display: grid; grid-template-columns: 320px minmax(0, 760px); justify-content: center; gap: 36px;
+  padding: 0 32px; }
+.rail { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow: auto; padding: 48px 0 120px; }
+plan-page > main { padding: 48px 0 120px; min-width: 0; }
+@media (max-width: 1100px) {
+  plan-page { display: block; max-width: 824px; margin: 0 auto; }
+  .rail { position: static; max-height: none; overflow: visible; padding: 40px 0 8px; }
+  plan-page > main { padding-top: 24px; }
+}
+
+/* header column */
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--gray-500); }
+h1 { font-family: var(--serif); font-weight: 400; color: var(--slate); font-size: 30px; line-height: 1.15;
+  letter-spacing: -.01em; margin: 10px 0 22px; }
+.acts { display: flex; flex-direction: column; gap: 10px; }
+.act { background: var(--white); border: 1.5px solid var(--gray-300); border-radius: 12px; padding: 10px 14px; font-size: 14px; }
+.act b { display: block; font-family: var(--mono); font-size: 12px; color: var(--clay); font-weight: 400; }
+
+/* sections as cards */
+plan-section { display: block; background: var(--white); border: 1.5px solid var(--gray-300); border-radius: 12px;
+  padding: 22px 26px; margin-bottom: 22px; }
+plan-section.deep { border: 2px solid var(--clay); }
+h2 { font-family: var(--serif); font-weight: 400; color: var(--slate); font-size: 21px; margin-bottom: 10px;
+  display: flex; align-items: baseline; gap: 10px; }
+h3 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--gray-500); font-weight: 400;
+  margin: 14px 0 2px; }
+.cnt { font-family: var(--mono); font-size: 12px; color: var(--gray-500); margin-left: auto; }
+.cnt.all { color: var(--olive); }
+
+/* items */
+plan-item { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; padding: 10px 0;
+  border-top: 1px solid var(--gray-150); }
+.items > plan-item:first-child { border-top: 0; }
+.cbody { flex: 1; min-width: 0; }
+.sub { flex-basis: 100%; padding-left: 30px; }
+.sub plan-item { border: 0; padding: 3px 0; }
+.deep .t { font-family: var(--serif); font-size: 19px; font-weight: 400; }
+.t { color: var(--slate); font-weight: 500; }
+.t a { color: var(--slate); }
+.src, .src a, .note { color: var(--gray-500); font-size: 13px; }
+plan-page > main > .note { margin: 4px 2px; }
+.k { display: inline-block; font-family: var(--mono); font-size: 11px; background: var(--oat); color: var(--slate);
+  padding: 2px 8px; border-radius: 6px; margin-right: 8px; vertical-align: 1px; }
+.k.deep { background: var(--clay); color: var(--ivory); }
+.k.ok { background: var(--olive); color: var(--ivory); }
+
+/* checkboxes (added by plan.js); a ticked item is struck through and grayed, it stays in place */
+.cbx { appearance: none; width: 18px; height: 18px; flex: none; margin-top: 2px; border: 1.5px solid var(--gray-300);
+  border-radius: 5px; background: var(--white); cursor: pointer; display: grid; place-content: center; }
+.cbx:checked { background: var(--olive); border-color: var(--olive); }
+.cbx:checked::after { content: '✓'; color: var(--white); font-size: 12px; line-height: 1; }
+.cbx:disabled { cursor: default; opacity: .7; }
+plan-item[done] > .cbody, plan-item.ticked > .cbody,
+plan-item[done] > .cbody :is(.t, a), plan-item.ticked > .cbody :is(.t, a) { color: var(--gray-500); text-decoration: line-through; }
+plan-item[done] > .cbody .k, plan-item.ticked > .cbody .k { opacity: .5; }
 
 /* bottom bar: ticks not sent yet */
-.bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:12px 24px;
-display:none;justify-content:center;align-items:center;gap:14px}
-.bar.on{display:flex}
-.bar button{font:14px var(--sans);padding:7px 14px;border-radius:10px;border:1px solid var(--clay);background:var(--clay);
-color:#fff;cursor:pointer}
-.bar .ok{color:var(--olive);font-size:13px}
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--white); border-top: 1.5px solid var(--gray-300);
+  padding: 12px 24px; display: none; justify-content: center; align-items: center; gap: 14px; }
+.bar.on { display: flex; }
+.btn { font-family: var(--sans); font-size: 14px; padding: 9px 16px; border-radius: 10px; border: 1.5px solid var(--gray-300);
+  background: var(--white); color: var(--slate); cursor: pointer; }
+.btn.accent { background: var(--clay); border-color: var(--clay); color: var(--ivory); }
+.bar .ok { color: var(--olive); font-size: 13px; }

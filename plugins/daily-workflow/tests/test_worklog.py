@@ -354,11 +354,12 @@ class PlanChecksTest(WorklogTestCase):
                     "deep_work|https://calendar.google.com/e", "code_review|https://github.com/org/shop/pull/412",
                     "meetings|15:00 1:1 Alice", "agenda|15:00 1:1 Alice|Promotion plan", "daily_update.today|Ship it",
                     "notion_changes|Card"):
-            self.assertIn(f'data-key="{key}"', page)
-        self.assertEqual(page.count('class="cbx"'), 8)
-        self.assertIn('data-label="Task &quot;B&quot; &lt;x&gt;"', page)
-        self.assertIn('<body data-file="plans/2026-11-26.json">', page)
-        self.assertIn('class="deep-box chk"', page)
+            self.assertIn(f'<plan-item key="{key}"', page)
+        self.assertEqual(page.count("<plan-item "), 8)
+        self.assertIn('label="Task &quot;B&quot; &lt;x&gt;"', page)
+        self.assertIn('<plan-page file="plans/2026-11-26.json">', page)
+        self.assertIn('<plan-section name="deep_work" class="deep">', page)
+        self.assertIn('<plan-section name="meetings"><h2>Meetings</h2>', page)
         self.assertNotIn("<style", page)
         for name in plan.ASSETS:
             self.assertEqual((core.plans_dir() / "assets" / name).read_bytes(), (plan.ASSETS_DIR / name).read_bytes())
@@ -384,8 +385,20 @@ class PlanChecksTest(WorklogTestCase):
         self.assertNotIn("done", data["priorities"][1])
         self.assertEqual(data["done_items"], ["agenda|15:00 1:1 Alice|Promotion plan"])
         page = path.with_suffix(".html").read_text()
-        self.assertIn('class="chk done" data-key="priorities|https://www.notion.so/a"', page)
-        self.assertIn('data-key="agenda|15:00 1:1 Alice|Promotion plan" data-label="Promotion plan" data-done', page)
+        self.assertIn('key="priorities|https://www.notion.so/a" label="Task A" url="https://www.notion.so/a" done>', page)
+        self.assertIn('key="agenda|15:00 1:1 Alice|Promotion plan" label="Promotion plan" done>', page)
+
+    def test_render_refreshes_every_plan_in_the_folder(self):
+        path = self.write_plan(self.plan_data())
+        old = core.plans_dir() / "2026-11-25.json"
+        old.write_text(json.dumps({"date": "2026-11-25", "priorities": [{"title": "Old task"}]}))
+        old.with_suffix(".html").write_text('<li class="chk" data-key="x">old markup</li>')
+        (core.plans_dir() / "2026-11-24.json").write_text("not json")
+        plan.render_file(path, "plans/2026-11-26.json")
+        page = old.with_suffix(".html").read_text()
+        self.assertIn('<plan-page file="plans/2026-11-25.json">', page)
+        self.assertIn('key="priorities|Old task"', page)
+        self.assertFalse((core.plans_dir() / "2026-11-24.html").exists())
 
     def test_keys_survive_reordering(self):
         data = self.plan_data()
@@ -486,6 +499,18 @@ class InboxTest(WorklogTestCase):
         page = html_path.read_text()
         self.assertIn("<inbox-two-minute>Reply &lt;yes&gt; in the DM</inbox-two-minute>", page)
         self.assertEqual(page.count("<inbox-two-minute>"), 1)
+
+    def test_render_keeps_calendar_and_today_outcomes(self):
+        data = self.page_data(entries=[
+            {"id": f"o{i}", "title": f"Entry {i}", "created_at": f"2026-11-2{i}T10:00:00+01:00",
+             "cards": [{"outcome": o, "title": f"Card {i}", "reminder": "2026-12-03"}]}
+            for i, o in enumerate(("calendar", "today", "today_candidates", "bogus"))
+        ])
+        _, html_path = self.render_page(data)
+        page = html_path.read_text()
+        for o in ("calendar", "today", "today_candidates", "keep"):
+            self.assertIn(f'outcome="{o}"', page)
+        self.assertNotIn('outcome="bogus"', page)
 
     def page_data(self, **extra):
         data = {

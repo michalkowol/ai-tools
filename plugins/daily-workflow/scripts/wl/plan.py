@@ -3,9 +3,12 @@
 Every value is escaped and only http(s) links are kept: the plan holds text
 gathered from email, Slack and transcripts, which is data, never markup.
 
-Every item gets a checkbox with a stable key (section + URL, or the text when there is no URL), so ticks kept in
-localStorage by `assets/plan.js` survive a re-render. `mark_done` writes ticks pasted back from the page into the
-JSON: `done: true` on object items, the key in `done_items` for plain-text items."""
+The page is light DOM custom elements with the content inside (readable without JS):
+<plan-page file> holds the header and <main>, every section is a <plan-section name>, every item a
+<plan-item key label [url] [done]>. `assets/plan.js` adds the checkboxes, the section counters and the "Copy done"
+bar. The key is section + URL, or the text when there is no URL, so ticks kept in localStorage survive a re-render.
+`mark_done` writes ticks pasted back from the page into the JSON: `done: true` on object items, the key in
+`done_items` for plain-text items."""
 from __future__ import annotations
 
 import html
@@ -14,9 +17,11 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from . import core
+
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 ASSETS = ("plan.css", "plan.js")
-PAGE_FORMAT = "1"
+PAGE_FORMAT = "2"
 
 KIND_LABEL = {"deep": "deep focus", "heavy": "heavy", "light": "light"}
 
@@ -70,7 +75,7 @@ def item_key(section: str, r: Any) -> str:
 
 
 class Checks:
-    """Builds the checkbox markup and knows which keys the JSON already marks as done."""
+    """Builds the <plan-item> markup and knows which keys the JSON already marks as done."""
 
     def __init__(self, plan: dict[str, Any]):
         self.done_items = set(plan.get("done_items") or [])
@@ -79,31 +84,34 @@ class Checks:
         key = item_key(section, r)
         done = (r.get("done") if isinstance(r, dict) else False) or key in self.done_items
         url = item_url(r) if isinstance(r, dict) else ""
-        out = f' class="chk{" done" if done else ""}" data-key="{e(key)}" data-label="{e(item_label(r))}"'
+        out = f' key="{e(key)}" label="{e(item_label(r))}"'
         if url:
-            out += f' data-url="{e(url)}"'
-        return out + (" data-done" if done else "")
+            out += f' url="{e(url)}"'
+        return out + (" done" if done else "")
 
-    def body(self, content: str, after: str = "") -> str:
-        return f'<input type="checkbox" class="cbx" aria-label="Done"><div class="cbody">{content}</div>{after}'
+    def item(self, section: str, r: Any, content: str, sub: str = "") -> str:
+        return f'<plan-item{self.attrs(section, r)}><div class="cbody">{content}</div>{sub}</plan-item>'
 
     def items(self, section: str, rows: list[dict[str, Any]], render, after=None) -> str:
         rows = [r for r in rows or [] if r]
         if not rows:
             return ""
-        return "<ol>" + "".join(
-            f"<li{self.attrs(section, r)}>{self.body(render(r), after(r) if after else '')}</li>" for r in rows
-        ) + "</ol>"
+        out = []
+        for r in rows:
+            sub = after(r) if after else ""
+            out.append(self.item(section, r, render(r), f'<div class="sub">{sub}</div>' if sub else ""))
+        return '<div class="items">' + "".join(out) + "</div>"
 
     def bullets(self, section: str, values: list[Any]) -> str:
         values = [v for v in values or [] if v]
         if not values:
             return ""
-        return "<ul>" + "".join(f"<li{self.attrs(section, v)}>{self.body(e(v))}</li>" for v in values) + "</ul>"
+        return '<div class="items">' + "".join(self.item(section, v, e(v)) for v in values) + "</div>"
 
 
-def section(title: str, body: str) -> str:
-    return f"<section><h2>{e(title)}</h2>{body}</section>" if body else ""
+def section(name: str, title: str, body: str, cls: str = "") -> str:
+    attrs = f' name="{e(name)}"' + (f' class="{e(cls)}"' if cls else "")
+    return f"<plan-section{attrs}><h2>{e(title)}</h2>{body}</plan-section>" if body else ""
 
 
 def titled(r: dict[str, Any]) -> str:
@@ -128,9 +136,9 @@ def render(plan: dict[str, Any], file_label: str = "") -> str:
         for a in (plan.get("timeline") or [])[:3]
     )
     out.append(
-        f'<div class="top"><main><div class="eyebrow">{e(eyebrow)}</div>'
+        f'<header class="rail"><div class="eyebrow">{e(eyebrow)}</div>'
         f"<h1>{e(plan.get('headline') or 'Plan for the day')}</h1>"
-        f'{f"<div class=acts>{acts}</div>" if acts else ""}</main></div><main>'
+        f'{f"<div class=acts>{acts}</div>" if acts else ""}</header><main>'
     )
 
     dw = plan.get("deep_work") or {}
@@ -146,8 +154,8 @@ def render(plan: dict[str, Any], file_label: str = "") -> str:
             f"{note(dw, 'div')}"
             f"{(' ' + link('event', dw.get('event_url'))) if safe_url(dw.get('event_url')) else ''}"
         )
-        attrs = checks.attrs("deep_work", dw).replace(' class="chk', ' class="deep-box chk', 1)
-        out.append(section("Deep Work", f"<div{attrs}>{checks.body(content)}</div>"))
+        out.append(section("deep_work", "Deep Work", f'<div class="items">{checks.item("deep_work", dw, content)}</div>',
+                           "deep"))
 
     def priority(r: dict[str, Any]) -> str:
         kind = r.get("kind") or ""
@@ -156,8 +164,8 @@ def render(plan: dict[str, Any], file_label: str = "") -> str:
         why = f'<div class="note">{e(r.get("why"))}</div>' if r.get("why") else ""
         return f"{badge}{titled(r)}{est}{why}"
 
-    out.append(section("Today's tasks", items("priorities", plan.get("priorities"), priority)))
-    out.append(section("Outside the limit", items(
+    out.append(section("priorities", "Today's tasks", items("priorities", plan.get("priorities"), priority)))
+    out.append(section("outside_limit", "Outside the limit", items(
         "outside_limit", plan.get("outside_limit"),
         lambda r: f'<span class="k">{e(r.get("kind"))}</span>{titled(r)}{note(r)}',
     )))
@@ -167,41 +175,41 @@ def render(plan: dict[str, Any], file_label: str = "") -> str:
         meta = " · ".join(x for x in (r.get("author"), r.get("waiting")) if x)
         return f'<span class="t">{head}</span> <span class="note">{e(meta)}</span><div>{e(r.get("reason"))}</div>'
 
-    out.append(section("Code review order", items("code_review", plan.get("code_review"), review)))
-    out.append(section("My pull requests", items(
+    out.append(section("code_review", "Code review order", items("code_review", plan.get("code_review"), review)))
+    out.append(section("my_prs", "My pull requests", items(
         "my_prs", plan.get("my_prs"),
         lambda r: f'<span class="k">{e(r.get("state"))}</span>'
         f'<span class="t">{link(r.get("title"), r.get("url"))}</span>{note(r)}',
     )))
-    out.append(section("Needs attention", items("needs_attention", plan.get("needs_attention"), titled)))
+    out.append(section("needs_attention", "Needs attention", items("needs_attention", plan.get("needs_attention"), titled)))
 
     def meeting(r: dict[str, Any]) -> str:
         return f'<span class="t">{e(r.get("start"))}–{e(r.get("end"))} {e(r.get("title"))}</span>{note(r)}'
 
-    out.append(section("Meetings", items(
+    out.append(section("meetings", "Meetings", items(
         "meetings", plan.get("meetings"), meeting,
         after=lambda r: bullets(f"agenda|{item_label(r)}", r.get("agenda")),
     )))
 
     daily = plan.get("daily_update") or {}
     daily_body = "".join(
-        f"<p class=t>{e(label)}</p>{bullets(f'daily_update.{key}', daily.get(key))}"
+        f"<h3>{e(label)}</h3>{bullets(f'daily_update.{key}', daily.get(key))}"
         for label, key in (("Yesterday", "yesterday"), ("Today", "today"), ("Blockers", "blockers"))
         if daily.get(key)
     )
-    out.append(section("For the daily", daily_body))
+    out.append(section("daily_update", "For the daily", daily_body))
 
     post = plan.get("post_daily") or {}
     post_body = "".join(
-        f"<p class=t>{e(label)}</p>{bullets(f'post_daily.{key}', post.get(key))}"
+        f"<h3>{e(label)}</h3>{bullets(f'post_daily.{key}', post.get(key))}"
         for label, key in POST_DAILY
         if post.get(key)
     )
-    out.append(section("After the daily", post_body))
-    out.append(section("Prep for tomorrow", items("tomorrow_prep", plan.get("tomorrow_prep"), titled)))
-    out.append(section("Follow-ups", items("follow_ups", plan.get("follow_ups"), titled)))
-    out.append(section("Resolved", items("resolved", plan.get("resolved"), titled)))
-    out.append(section("Notion changes", items(
+    out.append(section("post_daily", "After the daily", post_body))
+    out.append(section("tomorrow_prep", "Prep for tomorrow", items("tomorrow_prep", plan.get("tomorrow_prep"), titled)))
+    out.append(section("follow_ups", "Follow-ups", items("follow_ups", plan.get("follow_ups"), titled)))
+    out.append(section("resolved", "Resolved", items("resolved", plan.get("resolved"), titled)))
+    out.append(section("notion_changes", "Notion changes", items(
         "notion_changes", plan.get("notion_changes"),
         lambda r: f'<span class="k {"ok" if r.get("status") == "applied" else ""}">{e(r.get("status"))}</span>'
         f'<span class="t">{link(r.get("card"), r.get("url"))}</span> {e(r.get("change"))}',
@@ -214,6 +222,8 @@ def render(plan: dict[str, Any], file_label: str = "") -> str:
             + "</p>"
         )
     out.append(f'<p class="note">Generated {e(plan.get("generated_at"))}</p></main>')
+    out.insert(0, f'<plan-page file="{e(file_label)}">')
+    out.append("</plan-page>")
 
     title = f"{plan.get('date', '')} {mode} plan"
     return (
@@ -223,7 +233,7 @@ def render(plan: dict[str, Any], file_label: str = "") -> str:
         f"<title>{e(title)}</title>"
         "<link rel=\"stylesheet\" href=\"assets/plan.css\">"
         "<script defer src=\"assets/plan.js\"></script></head>"
-        f"<body data-file=\"{e(file_label)}\">"
+        "<body>"
         + "".join(out)
         + "</body></html>\n"
     )
@@ -287,11 +297,25 @@ def copy_assets(names: tuple[str, ...], target: Path) -> None:
         tmp.replace(target / name)
 
 
-def render_file(json_path: Path, file_label: str = "") -> Path:
+def _write_page(json_path: Path, file_label: str) -> Path:
     plan = json.loads(json_path.read_text(encoding="utf-8"))
-    copy_assets(ASSETS, json_path.parent / "assets")
     html_path = json_path.with_suffix(".html")
     tmp = html_path.with_name(f".{html_path.name}.tmp")
-    tmp.write_text(render(plan, file_label or f"plans/{json_path.name}"), encoding="utf-8")
+    tmp.write_text(render(plan, file_label), encoding="utf-8")
     tmp.replace(html_path)
+    return html_path
+
+
+def render_file(json_path: Path, file_label: str = "") -> Path:
+    """Renders the plan, then every other plan in the folder: the assets are shared, so old pages need the
+    current markup too."""
+    copy_assets(ASSETS, json_path.parent / "assets")
+    html_path = _write_page(json_path, file_label or f"plans/{json_path.name}")
+    for other in sorted(json_path.parent.glob("*.json")):
+        if other.resolve() == json_path.resolve():
+            continue
+        try:
+            _write_page(other, f"plans/{other.name}")
+        except (OSError, ValueError, TypeError, AttributeError) as err:
+            core.log(f"[plan] cannot re-render {other.name}: {err!r}")
     return html_path

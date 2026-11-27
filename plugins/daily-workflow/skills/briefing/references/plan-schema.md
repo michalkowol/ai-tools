@@ -1,7 +1,8 @@
 # Plan JSON (`plans/YYYY-MM-DD.json`, home mode: `plans/YYYY-MM-DD-home.json`)
 
-The plan JSON is the source of truth. `worklog render-plan <file>` renders the fixed HTML template
-copies `plan.css` and `plan.js` into `plans/assets/`, and prints the `open ~/.ai/worklog/plans/….html` command for the
+The plan JSON is the source of truth. `worklog render-plan <file>` renders the fixed HTML page
+(light DOM web components), copies `plan.css` and `plan.js` into `plans/assets/`, re-renders every other
+`plans/*.json` so old pages match the shared assets, and prints the `open ~/.ai/worklog/plans/….html` command for the
 host. Every field is optional;
 empty lists and empty sections are not rendered. All text is plain text: the renderer escapes it, and
 only `http(s)` URLs become links. Write in English.

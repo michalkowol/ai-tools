@@ -25,7 +25,8 @@ PAGE_FORMAT = "1"
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 ASSETS = ("inbox.css", "inbox-logic.js", "inbox-components.js")
 
-OUTCOMES = ("done", "next", "waiting", "agenda", "someday", "icebox", "trash", "keep")
+OUTCOMES = ("done", "next", "today_candidates", "today", "calendar", "waiting", "agenda", "someday", "icebox", "trash",
+            "keep")
 CARD_ATTRS = ("outcome", "category", "estimate", "priority", "reminder", "due", "project", "agenda")
 
 

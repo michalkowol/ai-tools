@@ -110,6 +110,14 @@ select.chip:focus-visible { border-color: var(--slate); }
 select.chip.mod { border-color: var(--clay); }
 select.chip option { background: var(--white); color: var(--slate); }
 .chip.static { background: var(--gray-150); cursor: default; }
+.chip.date { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px 2px 10px; }
+.chip.date.mod { border-color: var(--clay); }
+.chip.date:hover { border-color: var(--gray-500); }
+.chip.date .dl { color: var(--gray-500); }
+.chip.date input { font: inherit; color: var(--gray-700); border: 0; background: none; outline: none; cursor: pointer; }
+.chip.date.empty input { color: var(--gray-500); }
+.dx { border: 0; background: none; color: var(--gray-500); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+.dx:hover { color: var(--clay); }
 
 /* note for AI: low-key */
 .note-add { margin-top: 6px; background: none; border: none; color: var(--gray-500); font-size: 12.5px; cursor: pointer;

@@ -42,7 +42,8 @@ and check `[workday]`.
 | `/daily-workflow:inbox apply …` | the prompt copied from the processing page: applies the answers to Notion |
 
 Drop the daily transcript into `~/.ai/worklog/meetings/` with the date in the name, e.g. `2026-11-23-daily.txt`.
-Open the plan on the host with the printed command, e.g. `open ~/.ai/worklog/plans/2026-11-23.html`. Every item has a
+Open the plan on the host with the printed command, e.g. `open ~/.ai/worklog/plans/2026-11-23.html`. The header and
+the three acts of the day stay in a left column, the sections are cards with a "2/3" counter. Every item has a
 checkbox; ticks are kept in the browser, and "Copy done" in the bottom bar copies a prompt that marks them done in the
 plan and in Notion.
 
@@ -62,7 +63,7 @@ Capture creates new Inbox cards without asking. Every other Notion change comes 
   entries/YYYY-MM/<session>.jsonl         Worklog Entries, one file per session
   days/YYYY-MM-DD.md                      generated day view
   plans/YYYY-MM-DD[-home].json|html       briefing plans
-  plans/assets/                           plan page style and script, copied on every render
+  plans/assets/                           plan page style and components, copied on every render
   inbox/YYYY-MM-DD-HHMM.json|html          inbox processing pages
   inbox/assets/                           page components, copied from the plugin on every render
   state/inbox.json                        inbox cursor and 30-day registry of captured URLs

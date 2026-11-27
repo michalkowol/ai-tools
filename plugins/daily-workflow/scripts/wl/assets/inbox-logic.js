@@ -10,8 +10,8 @@
   'use strict';
 
   const OUTCOMES = {
-    done: 'Done', next: 'Next Actions', waiting: 'Waiting for', agenda: 'Agenda',
-    someday: 'Someday/Maybe', icebox: 'Icebox', trash: 'Trash', keep: 'Keep',
+    done: 'Done', next: 'Next Actions', today_candidates: 'Today candidates', today: 'Today', calendar: 'Calendar',
+    waiting: 'Waiting for', agenda: 'Agenda', someday: 'Someday/Maybe', icebox: 'Icebox', trash: 'Trash', keep: 'Keep',
   };
   const ESTIMATES = ['0.25 x 🍅', '0.5 x 🍅', '1 x 🍅', '2 x 🍅', '3 x 🍅', '4 x 🍅', '5 x 🍅', '6 x 🍅', '10 x 🍅', 'None'];
   const PRIORITIES = ['P1', 'P2', 'P3'];
@@ -20,6 +20,9 @@
   const FIELDS = {
     done: ['category', 'estimate', 'priority', 'reminder', 'due'],
     next: ['category', 'estimate', 'priority', 'reminder', 'due', 'project'],
+    today_candidates: ['category', 'estimate', 'priority', 'reminder', 'due', 'project'],
+    today: ['category', 'estimate', 'priority', 'reminder', 'due', 'project'],
+    calendar: ['category', 'estimate', 'priority', 'reminder', 'due', 'project'],
     waiting: ['category', 'priority', 'reminder', 'due', 'project'],
     agenda: ['agenda'],
     someday: ['category', 'reminder', 'due', 'project'],
@@ -48,20 +51,6 @@
     return `${rel} ${MON[m - 1]} ${d}`;
   }
 
-  // [value, label] pairs. `no date` / `no due date` is the empty value and stays empty on apply.
-  function dateOptions(current, kind, today) {
-    const due = kind === 'due';
-    const days = due ? 30 : 14;
-    const prefix = due ? 'due ' : '';
-    const opts = [['', due ? 'no due date' : 'no date']];
-    for (let n = 0; n <= days; n++) {
-      const iso = addDays(today, n);
-      opts.push([iso, prefix + formatDate(iso, today)]);
-    }
-    if (current && !opts.some(([v]) => v === current)) opts.push([current, prefix + formatDate(current, today)]);
-    return opts;
-  }
-
   function categoryLabel(category) {
     const set = new Set(category || []);
     if (set.has('Work') && set.has('Home')) return 'Work+Home';
@@ -78,12 +67,17 @@
     return out;
   }
 
-  // Returns a new card with one field changed. Switching to Waiting for without a reminder sets one.
+  // Returns a new card with one field changed. Switching to a status without a reminder sets one: Waiting for the
+  // follow-up day, Today and Today candidates today. Dates other than YYYY-MM-DD are dropped.
   function setField(card, field, value, today) {
     const c = normalizeCard(card);
     if (field === 'category') c.category = [...(CATEGORIES[value] || ['Work'])];
+    else if (field === 'reminder' || field === 'due') c[field] = ISO.test(String(value ?? '')) ? String(value) : '';
     else c[field] = String(value ?? '');
-    if (field === 'outcome' && value === 'waiting' && !c.reminder) c.reminder = addDays(today, WAITING_FOLLOW_UP_DAYS);
+    if (field === 'outcome' && !c.reminder) {
+      if (value === 'waiting') c.reminder = addDays(today, WAITING_FOLLOW_UP_DAYS);
+      if (value === 'today' || value === 'today_candidates') c.reminder = today;
+    }
     return c;
   }
 
@@ -143,7 +137,7 @@
 
   globalThis.InboxLogic = {
     OUTCOMES, ESTIMATES, PRIORITIES, CATEGORIES, FIELDS,
-    addDays, formatDate, dateOptions, categoryLabel, normalizeCard, setField,
+    addDays, formatDate, categoryLabel, normalizeCard, setField,
     sameCard, fieldChanged, entryChanged, incomplete, pick, applyLine, prompt, summary,
   };
 })();
