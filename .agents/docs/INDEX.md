@@ -4,6 +4,7 @@
 
 | Date | Title | Status | File |
 |------|-------|--------|------|
+| 2026-11-27 | Inbox: Slack To-dos as a source, a reading list and a local knowledge base | implemented | [2026-11-27-inbox-slack-todos-triage.html](specs/2026-11-27-inbox-slack-todos-triage.html) |
 | 2026-11-27 | Plan page: reorder items by drag and drop | implemented | [2026-11-27-plan-page-drag-and-drop-order.html](specs/2026-11-27-plan-page-drag-and-drop-order.html) |
 | 2026-11-27 | Plan page: notes for AI on items | implemented | [2026-11-27-plan-page-notes-for-ai.html](specs/2026-11-27-plan-page-notes-for-ai.html) |
 | 2026-11-27 | Rename briefing to morning | implemented | [2026-11-27-rename-briefing-to-morning.html](specs/2026-11-27-rename-briefing-to-morning.html) |

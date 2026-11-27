@@ -13,6 +13,7 @@ import time
 import tomllib
 from pathlib import Path
 from typing import Any, Iterator
+from urllib.parse import urlsplit, urlunsplit
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE_CONFIG = PLUGIN_ROOT / "config.example.toml"
@@ -269,6 +270,17 @@ def truncate(text: str | None, limit: int) -> str:
         return ""
     text = text.strip()
     return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def normalize_url(url: str) -> str:
+    """Registry key: no trailing slash, lower-case scheme and host. Query and fragment stay: Slack thread
+    permalinks and Gmail thread URLs differ only there."""
+    url = (url or "").strip()
+    parts = urlsplit(url)
+    if not parts.scheme:
+        return url
+    path = parts.path.rstrip("/") or parts.path
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, parts.query, parts.fragment))
 
 
 JIRA_KEY = re.compile(r"\b([A-Z][A-Z0-9]{1,9}-\d+)\b")

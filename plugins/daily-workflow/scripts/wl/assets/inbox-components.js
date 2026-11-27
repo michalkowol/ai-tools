@@ -8,10 +8,11 @@
  * Content (written by the renderer, plain text and attributes only):
  *   <inbox-app file date generated-at [captured] [skipped]>
  *     <inbox-agenda name>                         an Agenda card the user can pick
+ *     <inbox-knowledge file>title</inbox-knowledge>  a knowledge base file the user can pick for Reference
  *     <inbox-missing source>reason</inbox-missing>  a source that failed during capture
  *     <inbox-entry entry-id age [page-url] [waiting] [result]>
  *       <inbox-original [href] [label]>original title</inbox-original>
- *       <inbox-card outcome category estimate priority reminder due project agenda>proposed title</inbox-card>
+ *       <inbox-card outcome category estimate priority reminder due project agenda file>proposed title</inbox-card>
  *       <inbox-why>AI reason</inbox-why>
  *       <inbox-two-minute>the action to do right now</inbox-two-minute>   only when the two-minute rule fits
  *     </inbox-entry>
@@ -47,7 +48,7 @@
       return L.normalizeCard({
         outcome: a('outcome'), title: this.textContent.trim(), category: a('category') || 'Work',
         estimate: a('estimate'), priority: a('priority'), reminder: a('reminder'), due: a('due'),
-        project: a('project'), agenda: a('agenda'),
+        project: a('project'), agenda: a('agenda'), file: a('file'),
       });
     }
   }
@@ -81,6 +82,7 @@
       this.today = this.getAttribute('date') || new Date().toISOString().slice(0, 10);
       this.entries = [...this.querySelectorAll('inbox-entry')].map((e) => e.data).filter((e) => e.id && e.cards.length);
       this.people = [...this.querySelectorAll('inbox-agenda')].map((a) => a.getAttribute('name')).filter(Boolean);
+      this.files = [...this.querySelectorAll('inbox-knowledge')].map((k) => k.getAttribute('file')).filter(Boolean);
       this.missing = [...this.querySelectorAll('inbox-missing')]
         .map((m) => `${m.getAttribute('source') || ''} (${m.textContent.trim()})`);
       this.key = `daily-workflow:inbox:${this.file}`;
@@ -103,6 +105,7 @@
       let s = null;
       try { s = JSON.parse(localStorage.getItem(this.key)); } catch { s = null; }
       this.S = s && s.sig === this.sig() ? s : this.fresh();
+      this.S.cards = this.S.cards.map((cards) => cards.map(L.normalizeCard)); // state saved by an older page version
     }
     save() { try { localStorage.setItem(this.key, JSON.stringify(this.S)); } catch { /* storage unavailable */ } }
     get count() { return this.entries.length; }
@@ -321,6 +324,13 @@
         const people = c.agenda && !this.people.includes(c.agenda) ? [...this.people, c.agenda] : this.people;
         out.push(this.select(j, 'agenda', c.agenda, [['', 'choose person'], ...people.map((p) => [p, '→ ' + p])]));
       }
+      if (f.includes('file')) {
+        // A file the AI proposed that is not in the base yet stays a choice; apply creates it.
+        const proposed = [c.file, this.entries[this.S.cur].cards[j]?.file]
+          .filter((v, k, all) => v && !this.files.includes(v) && all.indexOf(v) === k);
+        out.push(this.select(j, 'file', c.file, [['', 'choose file'], ...this.files.map((v) => [v, '→ ' + v]),
+          ...proposed.map((v) => [v, `→ ${v} (new file)`])]));
+      }
       if (f.includes('project') && c.project) {
         out.push(h('span', { class: 'chip static', title: 'Change the project with a note for AI' }, c.project));
       }
@@ -412,7 +422,7 @@
       return h('div', { class: 'card' },
         h('div', { class: 'title' }, 'Summary'),
         h('table', {}, h('tr', {}, h('th', {}, '#'), h('th', {}, 'Inbox entry'), h('th', {}, 'Cards')), rows),
-        incomplete ? h('p', { class: 'warn' }, `${incomplete} Agenda card(s) without a person: apply skips them.`) : null,
+        incomplete ? h('p', { class: 'warn' }, `${incomplete} card(s) without a person (Agenda) or a file (Reference): apply skips them.`) : null,
         this.missing.length ? h('p', { class: 'why' }, `Missing sources: ${this.missing.join('; ')}`) : null,
         h('p', { class: 'why' }, 'Click a row or press ', kbd('k'), ' / ', kbd('←'), ' to go back. Entries you did not open are included with the AI proposal.'),
         h('div', { class: 'lbl' }, 'Prompt to paste into the session'),

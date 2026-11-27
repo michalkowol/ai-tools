@@ -12,7 +12,7 @@ vm.runInThisContext(source, { filename: 'inbox-logic.js' });
 const L = globalThis.InboxLogic;
 const TODAY = '2026-11-23';
 const card = (o) => L.normalizeCard(Object.assign({ outcome: 'next', title: 'Reply to Alice', category: ['Work'],
-  estimate: '1 x 🍅', priority: 'P1', reminder: TODAY, due: '', project: 'Hiring', agenda: '' }, o));
+  estimate: '1 x 🍅', priority: 'P1', reminder: TODAY, due: '', project: 'Hiring', agenda: '', file: '' }, o));
 const parse = (line) => JSON.parse(line);
 
 test('single card line has only the fields its status uses', () => {
@@ -47,6 +47,26 @@ test('agenda without a person stays empty and is incomplete', () => {
   assert.deepEqual(parse(L.applyLine('p1', [c], '')), { id: 'p1', outcome: 'agenda', title: 'Reply to Alice', agenda: '', note: '' });
   assert.equal(L.incomplete(card({ outcome: 'agenda', agenda: 'Alice' })), false);
   assert.equal(L.summary(c, TODAY), 'Agenda · choose person');
+});
+
+test('Reading list carries only the title, Reference the knowledge base file', () => {
+  assert.deepEqual(parse(L.applyLine('p1', [card({ outcome: 'reading', title: 'Retry patterns' })], '')),
+    { id: 'p1', outcome: 'reading', title: 'Retry patterns', note: '' });
+  const ref = card({ outcome: 'reference', title: 'Deploy freeze', file: 'event-pipeline.md' });
+  assert.deepEqual(parse(L.applyLine('p1', [ref], 'add the date')),
+    { id: 'p1', outcome: 'reference', title: 'Deploy freeze', file: 'event-pipeline.md', note: 'add the date' });
+  assert.equal(L.summary(ref, TODAY), 'Reference · → event-pipeline.md');
+  assert.equal(L.summary(card({ outcome: 'reading' }), TODAY), 'Reading list');
+  assert.equal(L.OUTCOMES.reading, 'Reading list');
+});
+
+test('reference without a file is incomplete', () => {
+  const c = card({ outcome: 'reference' });
+  assert.equal(L.incomplete(c), true);
+  assert.equal(L.summary(c, TODAY), 'Reference · choose file');
+  assert.equal(L.incomplete(L.setField(c, 'file', 'notes.md', TODAY)), false);
+  assert.equal(L.incomplete(card({ outcome: 'reading' })), false);
+  assert.equal(L.normalizeCard({ outcome: 'reference' }).file, '');
 });
 
 test('switching to Waiting for sets a reminder only when there is none', () => {

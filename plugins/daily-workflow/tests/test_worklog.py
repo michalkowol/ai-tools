@@ -16,7 +16,7 @@ from unittest import mock
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from wl import collector, core, github, inbox, plan, summarizer, views  # noqa: E402
+from wl import collector, core, github, inbox, knowledge, plan, summarizer, views  # noqa: E402
 
 FAKE_CLAUDE = textwrap.dedent(
     """\
@@ -107,6 +107,8 @@ class ConfigTest(WorklogTestCase):
     def test_example_config_parses(self):
         parsed = tomllib.loads((core.PLUGIN_ROOT / "config.example.toml").read_text())
         self.assertTrue(parsed["notion"]["view_top"].startswith("view://"))
+        self.assertEqual(parsed["notion"]["reading_list"], "")
+        self.assertEqual(parsed["knowledge"]["dir"], "knowledge")
 
     def test_jira_key_respects_project_keys(self):
         core.ensure_home()
@@ -706,12 +708,170 @@ class InboxTest(WorklogTestCase):
         self.assertEqual(out.returncode, 1)
         self.assertIn("has no cards", out.stderr)
 
+    def test_start_gives_the_day_filter_for_slack_todos(self):
+        win = json.loads(self.run_cli("inbox", "start").stdout)
+        today = core.now().date()
+        self.assertEqual(win["todos_after"], (today - dt.timedelta(days=31)).isoformat())
+
+    def test_check_separates_urls_stored_as_knowledge(self):
+        core.ensure_home()
+        knowledge.add([
+            {"file": "event-pipeline.md", "title": "Retry policy", "summary": "Three retries.",
+             "url": "https://team.slack.com/archives/C1/p1"},
+            {"kind": "request", "summary": "Asks for a review.", "url": "https://team.slack.com/archives/D1/p2"},
+        ])
+        inbox.record(["https://team.slack.com/archives/C1/p3"], None)
+        checked = json.loads(self.run_cli("inbox", "check", stdin=json.dumps([
+            "https://team.slack.com/archives/C1/p1", "https://team.slack.com/archives/D1/p2",
+            "https://team.slack.com/archives/C1/p3", "https://team.slack.com/archives/C1/p4",
+        ])).stdout)
+        self.assertEqual(checked["knowledge"], ["https://team.slack.com/archives/C1/p1"])
+        self.assertEqual(checked["known"], ["https://team.slack.com/archives/C1/p3"])
+        self.assertEqual(checked["new"], ["https://team.slack.com/archives/D1/p2", "https://team.slack.com/archives/C1/p4"])
+
+    def test_render_reading_and_reference_with_the_knowledge_files(self):
+        data = self.page_data(
+            knowledge_files=[{"file": "event-pipeline.md", "title": "Event <pipeline>"}, {"file": "../x.md", "title": "bad"}],
+            entries=[
+                {"id": "r1", "title": "Article", "cards": [{"outcome": "reading", "title": "Retry patterns"}]},
+                {"id": "r2", "title": "Note", "cards": [{"outcome": "reference", "title": "Deploy freeze", "file": "event-pipeline.md"}]},
+                {"id": "r3", "title": "Other", "cards": [{"outcome": "reference", "title": "Bad file", "file": "../../etc/passwd"}]},
+            ])
+        _, html_path = self.render_page(data)
+        page = html_path.read_text()
+        self.assertIn('<inbox-knowledge file="event-pipeline.md">Event &lt;pipeline&gt;</inbox-knowledge>', page)
+        self.assertEqual(page.count("<inbox-knowledge"), 1)
+        self.assertIn('<inbox-card outcome="reading" category="Work">Retry patterns</inbox-card>', page)
+        self.assertIn('<inbox-card outcome="reference" category="Work" file="event-pipeline.md">Deploy freeze</inbox-card>', page)
+        self.assertIn('<inbox-card outcome="reference" category="Work">Bad file</inbox-card>', page)
+        self.assertNotIn("passwd", page)
+
     def test_render_empty_inbox(self):
         core.ensure_home()
         path = inbox.inbox_dir() / "2026-11-23-1000.json"
         path.write_text(json.dumps({"date": "2026-11-23", "entries": []}))
         page = inbox.render_file(path, "inbox/2026-11-23-1000.json").read_text()
         self.assertIn('<inbox-app file="inbox/2026-11-23-1000.json" date="2026-11-23">\n</inbox-app>', page)
+
+
+class KnowledgeTest(WorklogTestCase):
+    run_cli = CliTest.run_cli
+    THREAD = "https://team.slack.com/archives/C1/p1700000000000100"
+
+    def setUp(self):
+        super().setUp()
+        core.ensure_home()
+        (self.home / "config.toml").write_text('[slack]\nchannels = ["#team-proj", "#proj-alerts"]\n')
+        core.reset_config_cache()
+
+    def lines(self, *rows):
+        return "/daily-workflow header\n" + "\n".join(json.dumps(r) for r in rows)
+
+    def test_first_start_reads_thirty_days_of_every_followed_channel(self):
+        start = json.loads(self.run_cli("knowledge", "start").stdout)
+        self.assertTrue(start["first_run"])
+        self.assertEqual(start["files"], [])
+        self.assertEqual(start["dir"], str(self.home / "knowledge"))
+        day = (core.now().date() - dt.timedelta(days=30)).isoformat()
+        self.assertEqual([(c["channel"], c["since"][:19], c["first_run"]) for c in start["channels"]],
+                         [("#team-proj", f"{day}T00:00:00", True), ("#proj-alerts", f"{day}T00:00:00", True)])
+        week = json.loads(self.run_cli("knowledge", "start", "--days", "7").stdout)
+        self.assertTrue(week["channels"][0]["since"].startswith((core.now().date() - dt.timedelta(days=7)).isoformat()))
+        self.assertEqual(week["channels"][0]["since_epoch"], int(core.parse_ts(week["channels"][0]["since"]).timestamp()))
+
+    def test_record_moves_only_the_channels_that_were_read(self):
+        out = self.run_cli("knowledge", "record", "--cursor", "2026-11-27T09:00:00+01:00", "#team-proj")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        channels = {c["channel"]: c for c in json.loads(self.run_cli("knowledge", "start", "--days", "90").stdout)["channels"]}
+        self.assertEqual(channels["#team-proj"]["since"], "2026-11-27T09:00:00+01:00")
+        self.assertFalse(channels["#team-proj"]["first_run"])
+        self.assertTrue(channels["#proj-alerts"]["first_run"])
+        self.assertEqual(self.run_cli("knowledge", "record", "#team-proj").returncode, 2)
+
+    def test_add_writes_topic_files_the_requests_list_and_the_index(self):
+        out = self.run_cli("knowledge", "add", stdin=self.lines(
+            {"file": "event-pipeline.md", "title": "Event pipeline", "about": "How events are consumed and retried."},
+            {"file": "event-pipeline.md", "date": "2026-11-20", "title": "Retry policy of the consumer",
+             "summary": "The consumer retries three times, then parks the event.",
+             "quote": "we retry 3 times\nthen it goes to the parking topic", "source": "#team-proj, Alice",
+             "url": self.THREAD,
+             "links": [{"url": "https://example.com/retries", "label": "Retry patterns", "summary": "Compares backoff strategies."},
+                       {"url": "https://example.atlassian.net/browse/PROJ-1234", "label": "PROJ-1234"}]},
+            {"file": "event-pipeline.md", "date": "2026-11-02", "title": "Schema registry", "summary": "Schemas live in one repo."},
+            {"kind": "request", "date": "2026-11-21", "source": "DM, Bob", "summary": "Asks for a review of the retry PR.",
+             "url": "https://team.slack.com/archives/D1/p1700000000000200"},
+        ))
+        self.assertEqual(out.returncode, 0, out.stderr)
+        result = json.loads(out.stdout)
+        self.assertEqual((result["added"], result["requests"], result["created"]), (2, 1, ["event-pipeline.md", "requests.md"]))
+        self.assertEqual([(f["file"], f["entries"], f["kind"]) for f in result["files"]],
+                         [("event-pipeline.md", 2, "topic"), ("requests.md", 1, "requests")])
+        self.assertTrue(result["open"].startswith("open "))
+        topic = (self.home / "knowledge" / "event-pipeline.md").read_text()
+        self.assertTrue(topic.startswith("# Event pipeline\n\nHow events are consumed and retried.\n\n## 2026-11-02 · Schema registry\n"))
+        self.assertIn("## 2026-11-20 · Retry policy of the consumer\n\nThe consumer retries three times, then parks the event.\n\n"
+                      "> we retry 3 times\n> then it goes to the parking topic\n\n"
+                      f"- Source: #team-proj, Alice · [thread]({self.THREAD})\n"
+                      "- [Retry patterns](https://example.com/retries): Compares backoff strategies.\n"
+                      "- [PROJ-1234](https://example.atlassian.net/browse/PROJ-1234)\n", topic)
+        requests = (self.home / "knowledge" / "requests.md").read_text()
+        self.assertTrue(requests.startswith("# Requests and tasks\n"))
+        self.assertTrue(requests.endswith(
+            "- 2026-11-21 · DM, Bob: Asks for a review of the retry PR. [thread](https://team.slack.com/archives/D1/p1700000000000200)\n"))
+        index = (self.home / "knowledge" / "README.md").read_text()
+        self.assertIn("| [event-pipeline.md](event-pipeline.md) | Event pipeline | How events are consumed and retried. | 2 |", index)
+        start = json.loads(self.run_cli("knowledge", "start").stdout)
+        self.assertFalse(start["first_run"])
+        self.assertEqual(start["files"][0]["about"], "How events are consumed and retried.")
+
+    def test_add_appends_and_skips_sources_already_in_the_base(self):
+        knowledge.add([{"file": "event-pipeline.md", "date": "2026-11-20", "title": "Retry policy", "summary": "Three retries.",
+                        "url": self.THREAD},
+                       {"kind": "request", "date": "2026-11-21", "summary": "First request."}])
+        result = knowledge.add([
+            {"file": "event-pipeline.md", "date": "2026-11-20", "title": "Same thread again", "summary": "x", "url": self.THREAD + "/"},
+            {"file": "event-pipeline.md", "date": "2026-11-25", "title": "Parking topic owner", "summary": "Carol owns it."},
+            {"kind": "request", "date": "2026-11-26", "summary": "Second request."},
+        ])
+        self.assertEqual((result["added"], result["requests"], result["created"]), (1, 1, []))
+        self.assertEqual(result["skipped"], [{"url": self.THREAD + "/", "reason": "already in the base", "file": "event-pipeline.md"}])
+        topic = (self.home / "knowledge" / "event-pipeline.md").read_text()
+        self.assertEqual(topic.count("## "), 2)
+        self.assertNotIn("Same thread again", topic)
+        self.assertTrue(topic.endswith("## 2026-11-25 · Parking topic owner\n\nCarol owns it.\n"))
+        requests = (self.home / "knowledge" / "requests.md").read_text()
+        self.assertTrue(requests.endswith("- 2026-11-21: First request.\n- 2026-11-26: Second request.\n"))
+        checked = json.loads(self.run_cli("knowledge", "check", self.THREAD, "https://team.slack.com/archives/C9/p9").stdout)
+        self.assertEqual((checked["known"], checked["new"]), ([self.THREAD], ["https://team.slack.com/archives/C9/p9"]))
+
+    def test_add_treats_content_as_data(self):
+        result = knowledge.add([
+            {"file": "../evil.md", "title": "Outside the folder", "summary": "x"},
+            {"file": "README.md", "title": "The index", "summary": "x"},
+            {"file": "requests.md", "title": "Knowledge in the requests file", "summary": "x"},
+            {"file": "notes.md", "kind": "bogus", "summary": "x"},
+            {"file": "notes.md"},
+            {"file": "notes.md", "title": "Title\nwith a break", "summary": "# not a heading <script>alert(1)</script>",
+             "quote": "<img src=x onerror=alert(1)>", "url": "javascript:alert(1)",
+             "links": [{"url": "javascript:alert(2)", "label": "bad"}, {"url": "https://example.com/a (b)", "label": "[x]"}, "junk"]},
+        ])
+        self.assertEqual(len(result["rejected"]), 5)
+        self.assertEqual(result["added"], 1)
+        self.assertEqual(sorted(p.name for p in (self.home / "knowledge").iterdir()), [".state.json", "README.md", "notes.md"])
+        self.assertFalse((self.home / "evil.md").exists())
+        text = (self.home / "knowledge" / "notes.md").read_text()
+        self.assertTrue(text.startswith("# Notes\n\n## Title with a break\n\n\\# not a heading &lt;script>alert(1)&lt;/script>\n"))
+        self.assertIn("> &lt;img src=x onerror=alert(1)>\n", text)
+        self.assertIn("- [(x)](https://example.com/a%20%28b%29)\n", text)
+        self.assertNotIn("javascript:", text)
+        self.assertEqual(knowledge.load_state()["sources"], {})
+
+    def test_folder_comes_from_the_config(self):
+        (self.home / "config.toml").write_text(f'[knowledge]\ndir = "{self.root / "kb"}"\n')
+        core.reset_config_cache()
+        knowledge.add([{"file": "notes.md", "title": "A note", "summary": "x"}])
+        self.assertTrue((self.root / "kb" / "notes.md").exists())
+        self.assertEqual(json.loads(self.run_cli("knowledge", "files").stdout)["dir"], str(self.root / "kb"))
 
 
 class PageLogicTest(unittest.TestCase):

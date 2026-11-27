@@ -12,6 +12,7 @@ Usage (the most common ones):
   worklog.py plan-result plans/2026-11-23.json < result-lines # what became of the notes for AI
   worklog.py inbox start|check|record       # inbox capture state (JSON)
   worklog.py render-inbox inbox/2026-11-23-0930.json
+  worklog.py knowledge start|files|check|add|record  # local knowledge base (md files) from Slack to-dos and channels
 """
 from __future__ import annotations
 
@@ -24,7 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from wl import collector, core, github, inbox, plan, summarizer, views  # noqa: E402
+from wl import collector, core, github, inbox, knowledge, plan, summarizer, views  # noqa: E402
 
 
 def host_path(path: Path) -> str:
@@ -213,15 +214,16 @@ def cmd_plan_result(args) -> int:
     return 0
 
 
-def read_urls(args) -> list[str]:
-    if args.urls:
-        return args.urls
+def read_list(values: list[str]) -> list[str]:
+    """The arguments, or a JSON list on stdin when there are none."""
+    if values:
+        return values
     if sys.stdin.isatty():
         return []
     raw = sys.stdin.read().strip()
     data = json.loads(raw) if raw else []
     if not isinstance(data, list):
-        raise SystemExit("expected a JSON list of URLs on stdin")
+        raise SystemExit("expected a JSON list on stdin")
     return [str(u) for u in data if u]
 
 
@@ -230,9 +232,31 @@ def cmd_inbox(args) -> int:
     if args.action == "start":
         dump(inbox.start())
     elif args.action == "check":
-        dump(inbox.check(read_urls(args)))
+        dump(inbox.check(read_list(args.urls)))
     else:
-        dump(inbox.record(read_urls(args), args.cursor))
+        dump(inbox.record(read_list(args.urls), args.cursor))
+    return 0
+
+
+def cmd_knowledge(args) -> int:
+    """The knowledge base: `start` (files and channel windows), `files`, `check` (source URLs already in the
+    base), `add` (file and entry lines on stdin), `record` (move the window of the channels that were read)."""
+    core.ensure_home()
+    if args.action == "start":
+        data = knowledge.start(args.days)
+    elif args.action == "files":
+        data = {"dir": str(knowledge.base_dir()), "files": knowledge.files()}
+    elif args.action == "check":
+        data = knowledge.check(read_list(args.items))
+    elif args.action == "add":
+        data = knowledge.add(read_json_lines())
+    else:
+        if not args.cursor:
+            print("[knowledge] record needs --cursor <started_at>", file=sys.stderr)
+            return 2
+        data = knowledge.record(args.cursor, read_list(args.items))
+    data["open"] = f"open {host_path(knowledge.base_dir())}"
+    dump(data)
     return 0
 
 
@@ -337,6 +361,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("urls", nargs="*", help="source URLs (or a JSON list on stdin)")
     p.add_argument("--cursor", help="record: the started_at of this capture")
     p.set_defaults(func=cmd_inbox)
+
+    p = sub.add_parser("knowledge", help="knowledge base: files, channel windows, duplicate check, add, record")
+    p.add_argument("action", choices=("start", "files", "check", "add", "record"))
+    p.add_argument("items", nargs="*", help="check: source URLs; record: the channels that were read "
+                                            "(or a JSON list on stdin)")
+    p.add_argument("--days", type=int, help="start: days to read from a channel the first time (default 30)")
+    p.add_argument("--cursor", help="record: the started_at of this run")
+    p.set_defaults(func=cmd_knowledge)
 
     p = sub.add_parser("render-inbox", help="render an inbox JSON into the processing page")
     p.add_argument("path")

@@ -11,7 +11,8 @@
 
   const OUTCOMES = {
     done: 'Done', next: 'Next Actions', today_candidates: 'Today candidates', today: 'Today', calendar: 'Calendar',
-    waiting: 'Waiting for', agenda: 'Agenda', someday: 'Someday/Maybe', icebox: 'Icebox', trash: 'Trash', keep: 'Keep',
+    waiting: 'Waiting for', agenda: 'Agenda', reading: 'Reading list', reference: 'Reference',
+    someday: 'Someday/Maybe', icebox: 'Icebox', trash: 'Trash', keep: 'Keep',
   };
   const ESTIMATES = ['0.25 x 🍅', '0.5 x 🍅', '1 x 🍅', '2 x 🍅', '3 x 🍅', '4 x 🍅', '5 x 🍅', '6 x 🍅', '10 x 🍅', 'None'];
   const PRIORITIES = ['P1', 'P2', 'P3'];
@@ -25,12 +26,14 @@
     calendar: ['category', 'estimate', 'priority', 'reminder', 'due', 'project'],
     waiting: ['category', 'priority', 'reminder', 'due', 'project'],
     agenda: ['agenda'],
+    reading: [], // the title names the material; apply appends it to the Reading list page
+    reference: ['file'], // the knowledge base file the entry goes to
     someday: ['category', 'reminder', 'due', 'project'],
     icebox: ['category', 'reminder', 'due', 'project'],
     trash: [],
     keep: [],
   };
-  const CARD_KEYS = ['outcome', 'title', 'category', 'estimate', 'priority', 'reminder', 'due', 'project', 'agenda'];
+  const CARD_KEYS = ['outcome', 'title', 'category', 'estimate', 'priority', 'reminder', 'due', 'project', 'agenda', 'file'];
   const WAITING_FOLLOW_UP_DAYS = 3;
 
   const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -59,7 +62,7 @@
 
   function normalizeCard(raw) {
     const c = Object.assign({ outcome: 'keep', title: '', category: ['Work'], estimate: '', priority: '',
-      reminder: '', due: '', project: '', agenda: '' }, raw || {});
+      reminder: '', due: '', project: '', agenda: '', file: '' }, raw || {});
     if (!OUTCOMES[c.outcome]) c.outcome = 'keep';
     if (typeof c.category === 'string') c.category = CATEGORIES[c.category] || ['Work'];
     const out = {};
@@ -90,7 +93,8 @@
     return cards.some((c, j) => !sameCard(baseCards[j], c));
   }
 
-  const incomplete = (card) => card.outcome === 'agenda' && !card.agenda;
+  // Apply skips these: Agenda without a person, Reference without a knowledge base file.
+  const incomplete = (card) => (card.outcome === 'agenda' && !card.agenda) || (card.outcome === 'reference' && !card.file);
 
   // The part of a card that goes into the apply line: the outcome, the title (not for Trash/Keep)
   // and only the fields the outcome uses. Keep is just {"outcome":"keep"}.
@@ -131,6 +135,7 @@
     if (f.includes('reminder') && c.reminder) parts.push(formatDate(c.reminder, today));
     if (f.includes('due') && c.due) parts.push('due ' + formatDate(c.due, today));
     if (c.outcome === 'agenda') parts.push(c.agenda ? '→ ' + c.agenda : 'choose person');
+    if (c.outcome === 'reference') parts.push(c.file ? '→ ' + c.file : 'choose file');
     if (f.includes('project') && c.project) parts.push(c.project);
     return parts.join(' · ');
   }

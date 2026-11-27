@@ -14,6 +14,7 @@ order in the file does not matter.
   "generated_at": "2026-11-23T09:31:04+01:00",
   "captured": {"created": 7, "skipped": 3},
   "agenda_cards": [{"id": "notion-page-id", "name": "Alice"}],
+  "knowledge_files": [{"file": "event-pipeline.md", "title": "Event pipeline"}],
   "entries": [
     {
       "id": "notion-page-id",
@@ -27,7 +28,8 @@ order in the file does not matter.
       "two_minute": "",
       "cards": [
         {"outcome": "next", "title": "Review Alice's batch processing (shop#412)", "category": ["Work"],
-         "estimate": "1 x 🍅", "priority": "P1", "reminder": "2026-11-23", "due": "", "project": "", "agenda": ""}
+         "estimate": "1 x 🍅", "priority": "P1", "reminder": "2026-11-23", "due": "", "project": "", "agenda": "",
+         "file": ""}
       ],
       "result": ""
     }
@@ -38,6 +40,8 @@ order in the file does not matter.
 
 - `title`: the current Notion title, shown as "Original: …". `url`: the Notion page. `source`: from the URL field and
   the card body; `null` for entries added by hand.
+- `knowledge_files`: the files of the knowledge base (`file` and `title` from `worklog knowledge files`), the choices
+  for the Reference outcome. Empty when the base does not exist yet.
 - `cards`: the proposal, at least one. Card 1 is always the original page, the others become new cards. Every card has
   a `title`, Trash and Keep too; if card 1 has none, the renderer shows the original title.
 - `waiting_on_me`: someone is blocked on the user (a direct question, a review request, a requested change). These
@@ -61,6 +65,8 @@ order in the file does not matter.
 | `today` | only picked by the user on the page, never proposed | Status `Today` |
 | `waiting` | the next step is someone else's | Status `Waiting for`, Reminder = the follow-up day |
 | `agenda` | a topic to raise with one person who has an Agenda card | append to that card, trash this one |
+| `reading` | material to read, watch or try later (an article, a recording, a tool, a document), nothing else to do | append a bullet to the Reading list page, trash this card |
+| `reference` | information worth keeping (an agreement, an explanation, a how-to, an answer), nothing to do | append an entry to a knowledge base file, trash this card |
 | `someday` | maybe later, no commitment | Status `Someday/Maybe` |
 | `icebox` | parked, keep for reference | Status `Icebox` |
 | `trash` | no action and nothing to keep (FYI, already handled, noise) | move the page to Trash |
@@ -94,6 +100,14 @@ order in the file does not matter.
 - Project only from existing options, empty when nothing fits. The page shows it read-only; the user changes it
   through the note.
 - Agenda: `agenda` is the exact name of an Agenda card from `agenda_cards`, or empty when unsure.
+- Slack to-dos (source line `Slack to-do: …`) are one of three things. A request or a task gets a task outcome as
+  any other entry. Material the user wants to read or watch later is `reading`. Information to remember is
+  `reference`. Other entries can be `reading` or `reference` too when they fit.
+- `reading` and `reference`: the title names the material or the information, it is not an action ("Retry patterns
+  for event consumers", "Staging deploys are frozen until Monday"). No Estimate, priority, dates or project.
+- Reference: `file` is the knowledge base file the entry belongs to, one of `knowledge_files`. When none fits,
+  propose a new file name (lower-case words with dashes, `.md`): the page marks it "new file" and choosing it is the
+  approval to create it. Empty when unsure.
 
 ## Fields per status
 
@@ -105,6 +119,8 @@ The page shows, and the apply line carries, only these fields (plus `title`, exc
 | `next`, `calendar`, `today_candidates`, `today` | category, estimate, priority, reminder, due, project |
 | `waiting` | category, priority, reminder, due, project |
 | `agenda` | agenda |
+| `reading` | none |
+| `reference` | file |
 | `someday`, `icebox` | category, reminder, due, project |
 | `trash`, `keep` | none |
 
@@ -131,6 +147,15 @@ card. Look up the entry by `id` in the page JSON, ignore unknown ids.
   captured source line, quote and link always stay.
 - `agenda`: append one bullet to the body of the Agenda card named in `agenda` (the card title, the note if any, a
   link to the source or the card), then move the Inbox card to Trash. Empty `agenda`: skip the card and report it.
+- `reading`: append one bullet to the end of the page in `[notion].reading_list`: the title as a link to the
+  material (the first link in the source message, or the source itself when it has none), one sentence on why to
+  read it, and the source (`from #team-proj, Bob, 2026-11-20`, linked to the message when it differs from the
+  material). Then move the Inbox card to Trash. Empty `reading_list`: skip the card, leave it in the Inbox and
+  report that the page address is missing in the config.
+- `reference`: build one knowledge entry from the card and its source (format and the rules for threads and linked
+  pages in `knowledge.md`): `file` from the line, `url` = the source URL, and for a file that does not exist yet a
+  file line first. Pipe it into `worklog knowledge add`, then move the Inbox card to Trash, also when `add` skipped
+  the entry because the URL is already in the base. Empty `file` or a rejected entry: skip the card and report it.
 - `trash`: `notion-delete-pages` with `user_confirmed: true` (the pasted line is the user's explicit request); the page
   can be restored from Trash.
 - `note`: a correction or context for every card of the entry (e.g. "project Hiring", "no project", "this is about

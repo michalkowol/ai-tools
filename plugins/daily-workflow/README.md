@@ -7,10 +7,11 @@ Personal Claude Code plugin with three parts that share one local Worklog:
   compaction. `/daily-workflow:worklog` forces it now.
 - **Morning**: `/daily-workflow:morning` plans the day before the daily, `update` corrects it from the daily
   transcript and schedules the Deep Work block, `home` plans home tasks.
-- **Inbox**: `/daily-workflow:inbox` captures unanswered Slack messages, saved Slack items, PRs waiting for review,
+- **Inbox**: `/daily-workflow:inbox` captures unanswered Slack messages, Slack to-dos, PRs waiting for review,
   own PRs that need action and important email into the Notion GTD Inbox, then renders the whole Inbox as an HTML
   page that shows one entry at a time with the AI proposal already chosen. PRs under 10 changed files waiting for review get no card:
-  a recurring code review card in Notion covers them.
+  a recurring code review card in Notion covers them. `/daily-workflow:inbox knowledge` keeps a local knowledge
+  base: md files built from every Slack to-do and from the followed channels.
 
 ## Setup
 
@@ -25,7 +26,8 @@ Personal Claude Code plugin with three parts that share one local Worklog:
 The first hook creates `~/.ai/worklog` as a local git repo with `config.toml` from
 [config.example.toml](config.example.toml). Fill in `[worklog].jira_project_keys`,
 `[github].team_repos`, `[slack].channels`, the `[notion]` IDs of your GTD database and views, `[jira].base_url`,
-and check `[workday]`.
+and check `[workday]`. For the "Reading list" outcome of the Inbox create an empty page in Notion and put its URL
+into `[notion].reading_list`. `[knowledge].dir` is the folder of the knowledge base.
 
 ## Usage
 
@@ -40,6 +42,7 @@ and check `[workday]`.
 | `/daily-workflow:inbox` | capture into the Notion Inbox, then the processing page with a proposal for every Inbox card |
 | `/daily-workflow:inbox process` | only the processing page, no capture |
 | `/daily-workflow:inbox apply …` | the prompt copied from the processing page: applies the answers to Notion |
+| `/daily-workflow:inbox knowledge [days]` | builds or extends the knowledge base from every Slack to-do and the followed channels |
 
 Drop the daily transcript into `~/.ai/worklog/meetings/` with the date in the name, e.g. `2026-11-23-daily.txt`.
 Open the plan on the host with the printed command, e.g. `open ~/.ai/worklog/plans/2026-11-23.html`. The header and
@@ -57,6 +60,21 @@ proposal; `j` / `→` accepts it and moves on, so only change what is wrong: cli
 After the last entry the summary holds the prompt to paste into the session. Progress survives a page reload.
 Capture creates new Inbox cards without asking. Every other Notion change comes from the pasted prompt.
 
+Slack to-dos: capture takes the to-dos whose message is at most 30 days old (the search is `is:todos`; Slack has no
+API for them, so completed ones cannot be told apart and to-dos typed by hand are not found). On the page a to-do
+is a task like any other entry, or one of two outcomes with nothing to do: "Reading list" appends a bullet with the
+link to one Notion page, "Reference" appends an entry to a file of the knowledge base. Both move the Inbox card to
+Trash. Nothing is ever changed in Slack.
+
+The knowledge base (`open ~/.ai/worklog/knowledge`) is a folder of md files: topic files with one entry per
+source (date, summary, a short quote, the source and its links, with a summary of public pages behind them) and
+`requests.md`, a list of the requests and tasks found in the to-dos. `/daily-workflow:inbox knowledge` reads every
+to-do and the followed channels (`[slack].channels`: the last 30 days the first time, or the number of days given,
+then only what is new), proposes the list of files on the first run and waits for your approval, and later adds
+only what is not in the base yet; it asks before it creates a new file. Summaries are in English, quotes in the
+original. Links to company systems are never fetched. Capture creates no card for a to-do the base already holds
+as knowledge.
+
 ## Worklog layout
 
 ```
@@ -71,6 +89,8 @@ Capture creates new Inbox cards without asking. Every other Notion change comes 
   inbox/YYYY-MM-DD-HHMM.json|html          inbox processing pages
   inbox/assets/                           page components, copied from the plugin on every render
   state/inbox.json                        inbox cursor and 30-day registry of captured URLs
+  knowledge/<topic>.md, requests.md       knowledge base: topic files and the list of requests
+  knowledge/README.md, .state.json        its index; the sources already in the base and the channel windows
   meetings/                               daily transcripts
   config.toml
   locks/, logs/                           per-session locks and logs (not committed)

@@ -51,7 +51,9 @@ description ("Current logged in user's user_id is …") or `[slack].user_id`.
 1. DMs and group DMs: `channel_types = "im,mpim"`, filters `after:<since>`.
 2. Followed channels: for every channel in `[slack].channels`, filters `in:<channel> after:<since>`.
 3. Direct mentions anywhere: keywords `["<@USER_ID>"]`, filters `after:<since>`, all channel types.
-4. Slack To-dos (saved for later): filters `is:saved`, no date filter.
+4. Slack To-dos: filters `is:todos after:<since>`: only the to-dos whose message is from the last workday or later,
+   as candidates for Needs attention. Older to-dos reach the plan through their Notion cards (the inbox skill
+   captures them). Spell the filter exactly: Slack ignores an unknown modifier and returns unrelated messages.
 
 Before an item lands in Needs attention, open its thread once (`slack_read_thread`). If the user already replied
 or reacted with any emoji, it moves to Resolved or is dropped. A group mention that anyone on the list could

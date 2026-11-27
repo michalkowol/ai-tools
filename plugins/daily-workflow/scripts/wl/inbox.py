@@ -14,20 +14,21 @@ import datetime as dt
 import json
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
 
 from . import core
+from . import knowledge
 from . import plan
 from .plan import e, safe_url
 
 REGISTRY_DAYS = 30
+TODOS_DAYS = 30
 PAGE_FORMAT = "1"
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 ASSETS = ("inbox.css", "inbox-logic.js", "inbox-components.js")
 
-OUTCOMES = ("done", "next", "today_candidates", "today", "calendar", "waiting", "agenda", "someday", "icebox", "trash",
-            "keep")
-CARD_ATTRS = ("outcome", "category", "estimate", "priority", "reminder", "due", "project", "agenda")
+OUTCOMES = ("done", "next", "today_candidates", "today", "calendar", "waiting", "agenda", "reading", "reference",
+            "someday", "icebox", "trash", "keep")
+CARD_ATTRS = ("outcome", "category", "estimate", "priority", "reminder", "due", "project", "agenda", "file")
 
 
 # ---------------------------------------------------------------- state
@@ -40,15 +41,7 @@ def state_path() -> Path:
     return core.home() / "state" / "inbox.json"
 
 
-def normalize_url(url: str) -> str:
-    """Registry key: no trailing slash, lower-case scheme and host. Query and fragment stay: Slack thread
-    permalinks and Gmail thread URLs differ only there."""
-    url = (url or "").strip()
-    parts = urlsplit(url)
-    if not parts.scheme:
-        return url
-    path = parts.path.rstrip("/") or parts.path
-    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, parts.query, parts.fragment))
+normalize_url = core.normalize_url
 
 
 def load_state() -> dict[str, Any]:
@@ -81,6 +74,8 @@ def start() -> dict[str, Any]:
         "since": since.isoformat(timespec="seconds"),
         "since_epoch": int(since.timestamp()),
         "since_date": since.date().isoformat(),
+        # Slack `after:` excludes the day itself, so one day earlier covers the last TODOS_DAYS days of messages.
+        "todos_after": (now.date() - dt.timedelta(days=TODOS_DAYS + 1)).isoformat(),
         "started_at": now.isoformat(timespec="seconds"),
         "first_run": not state["cursor"],
         "registry_size": len(prune(state["seen"], now)),
@@ -88,11 +83,16 @@ def start() -> dict[str, Any]:
 
 
 def check(urls: list[str]) -> dict[str, list[str]]:
+    """`known`: captured in the last REGISTRY_DAYS days. `knowledge`: not captured, but stored as knowledge in the
+    knowledge base, so a to-do with that URL needs no card. `new`: the rest."""
     seen = prune(load_state()["seen"], core.now())
-    new, known = [], []
+    stored = knowledge.stored_as_knowledge()
+    new, known, filed = [], [], []
     for url in urls:
-        (known if normalize_url(url) in seen else new).append(url)
-    return {"new": list(dict.fromkeys(new)), "known": list(dict.fromkeys(known))}
+        key = normalize_url(url)
+        (known if key in seen else filed if key in stored else new).append(url)
+    return {"new": list(dict.fromkeys(new)), "known": list(dict.fromkeys(known)),
+            "knowledge": list(dict.fromkeys(filed))}
 
 
 def record(urls: list[str], cursor: str | None) -> dict[str, Any]:
@@ -153,7 +153,8 @@ def _category(value: Any) -> str:
 def _card(card: dict[str, Any], fallback_title: Any = "") -> str:
     outcome = card.get("outcome") if card.get("outcome") in OUTCOMES else "keep"
     attrs = [("outcome", outcome), ("category", _category(card.get("category")))]
-    attrs += [(k, card.get(k)) for k in CARD_ATTRS[2:]]
+    attrs += [(k, card.get(k)) for k in CARD_ATTRS[2:-1]]
+    attrs.append(("file", card.get("file") if knowledge.valid_file(card.get("file")) else ""))
     title = card.get("title") or fallback_title
     return f"    <inbox-card{_attrs(attrs)}>{e(title)}</inbox-card>\n"
 
@@ -190,6 +191,10 @@ def render(data: dict[str, Any], file_label: str) -> str:
         f"  <inbox-agenda{_attrs([('name', a.get('name'))])}></inbox-agenda>\n"
         for a in data.get("agenda_cards") or [] if isinstance(a, dict) and a.get("name")
     )
+    files = "".join(
+        f"  <inbox-knowledge{_attrs([('file', k.get('file'))])}>{e(k.get('title'))}</inbox-knowledge>\n"
+        for k in data.get("knowledge_files") or [] if isinstance(k, dict) and knowledge.valid_file(k.get("file"))
+    )
     missing = "".join(
         f"  <inbox-missing{_attrs([('source', m.get('source'))])}>{e(m.get('reason'))}</inbox-missing>\n"
         for m in data.get("missing_sources") or [] if isinstance(m, dict)
@@ -204,7 +209,7 @@ def render(data: dict[str, Any], file_label: str) -> str:
         "<script defer src=\"assets/inbox-logic.js\"></script>\n"
         "<script defer src=\"assets/inbox-components.js\"></script>\n"
         "</head>\n<body>\n"
-        f"<inbox-app{app}>\n{agenda}{missing}{body}</inbox-app>\n"
+        f"<inbox-app{app}>\n{agenda}{files}{missing}{body}</inbox-app>\n"
         "</body>\n</html>\n"
     )
 

@@ -21,7 +21,7 @@
     },
     {
       "name": "daily-workflow",
-      "description": "Work Logger hooks that log work from parallel sessions into a local Worklog, a Morning day plan built from it, and an Inbox that captures Slack, PRs and email into Notion",
+      "description": "Work Logger hooks that log work from parallel sessions into a local Worklog, a Morning day plan built from it, and an Inbox that captures Slack messages and to-dos, PRs and email into Notion and keeps a local knowledge base",
       "source": "./plugins/daily-workflow",
       "category": "productivity"
     }

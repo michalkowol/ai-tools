@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Inbox: Slack To-dos as a source, a reading list and a local knowledge base</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-27" status="implemented">
+    <h1>Inbox: Slack To-dos as a source, a reading list and a local knowledge base</h1>
+    <p>Capture picks up what was added to To-dos in Slack, processing splits it into tasks, things to read and important information, and a knowledge mode builds a local knowledge base from the to-dos and the followed channels.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>The user wants the Inbox to also catch what was added to To-dos in Slack, and asks to check how it can be fetched. They also want an approach to what they save "for later": sometimes these are tasks, sometimes important information, and sometimes interesting articles or messages.</p>
+    <p>Round 1 added a requirement: at the very beginning go through all to-dos and build a knowledge base from them in several md files. The first step is to decide how many files are needed, the second is to assign the items to the files.</p>
+    <p>Round 2 added another: the knowledge should come from various sources, that is from the to-dos, but also from messages in channels.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <h3>Slack</h3>
+    <ul>
+      <li>Since October 2026 the Later tab is replaced by To-dos (a personal task list) and the Saved section in Home (material to keep). Old Later items with a reminder became to-dos, the rest went to Saved. <cite><a href="https://slack.com/help/articles/55757634348435-Later-is-now-To-dos">Slack Help: Later is now To-dos</a>; <a href="https://slack.com/help/articles/360042650274-Save-messages-and-files-for-later">Save messages and files for later</a></cite></li>
+      <li>A to-do is "In-progress" or "Completed", has an optional reminder and can be cleared from the list. A to-do can also be added without a message, by typing it in the tab. <cite><a href="https://slack.com/help/articles/55757634348435-Later-is-now-To-dos">Slack Help: Later is now To-dos</a></cite></li>
+      <li>There is no public API for Later, To-dos or Saved. <code>stars.list</code> does not reflect saved items and is to be retired. <cite><a href="https://docs.slack.dev/changelog/2023-07-its-later-already-for-stars-and-reminders">Slack changelog 2023-07</a>; <a href="https://slack.com/help/articles/4426294050451-Slack-feature-and-subscription-retirements">Slack feature retirements</a></cite></li>
+    </ul>
+    <h3>Slack connector (tests from 2026-11-27)</h3>
+    <ul>
+      <li>The connector has no tool for to-dos or saved items; what is left is the search <code>slack_search_public_and_private</code> with modifiers. <cite>the Slack connector's tool list in the session</cite></li>
+      <li><code>is:todos</code> works as a filter and returns the user's to-dos. An unknown modifier is silently ignored and returns the newest messages of the whole workspace; <code>is:todo</code>, <code>is:later</code> and the made-up <code>is:foobarbaz</code> behave this way. <cite>search with the Slack connector</cite></li>
+      <li><code>is:saved</code> is recognised, but returns no result. <cite>search with the Slack connector</cite></li>
+      <li><code>is:todos</code> returns more than 180 messages, and Slack shows 153 to-dos "In progress", so the result includes the completed ones too. The state cannot be narrowed: <code>is:completed</code>, <code>is:done</code> and <code>is:open</code> are ignored. <cite>search with the Slack connector; the number 153 read by the user from the To-dos tab</cite></li>
+      <li><code>is:todos</code> combines with the message date filter: <code>is:todos after:2026-11-20</code> returns 7 items. The first 40 results reach 43 days back. <cite>search with the Slack connector</cite></li>
+      <li>The to-dos hold requests to the user, agreements and information to remember, and links to articles, recordings and tools. There are no files. <cite>a sample of 100 <code>is:todos</code> results</cite></li>
+      <li>The connector cannot complete or clear a to-do. <cite>the Slack connector's tool list in the session</cite></li>
+    </ul>
+    <h3>Plugin</h3>
+    <ul>
+      <li>Capture has the source "Saved items (Slack To-dos)" with the filter <code>is:saved</code> and no time limit, so today it catches nothing. Morning has the same source. <cite><code>plugins/daily-workflow/skills/inbox/references/capture.md</code>:17; <code>skills/morning/references/sources.md</code>:54</cite></li>
+      <li>Duplicates: a registry of captured URLs kept for 30 days and a lookup of the URL in the whole Notion database. <cite><code>scripts/wl/inbox.py</code> <code>REGISTRY_DAYS</code>; <code>capture.md</code>, "Duplicates"</cite></li>
+      <li>Capture only creates new Inbox cards and changes nothing in the sources (no reactions, marking or messages). <cite><code>skills/inbox/SKILL.md</code>:92-93</cite></li>
+      <li>Processing outcomes: <code>done</code>, <code>next</code>, <code>today_candidates</code>, <code>today</code>, <code>calendar</code>, <code>waiting</code>, <code>agenda</code>, <code>someday</code>, <code>icebox</code> ("parked, keep for reference"), <code>trash</code>, <code>keep</code>. <code>agenda</code> appends a bullet to the body of an Agenda card and moves the Inbox card to the trash. <cite><code>skills/inbox/references/processing.md</code>:63-65, 132</cite></li>
+      <li>In the GTD database things to read are separate cards in Next Actions today. <cite>a query on the GTD database, 2026-11-27</cite></li>
+      <li><code>~/.ai/worklog/</code> is a local git repo with no remote; the same path works in the container and on the host. It holds the plans, the Inbox pages and the transcripts. <cite><code>plugins/daily-workflow/README.md</code>, "Worklog layout"; <code>scripts/worklog.py</code> <code>host_path</code></cite></li>
+      <li>Capture already reads the followed channels from <code>[slack].channels</code>; the connector reads a channel's history for a date range (<code>slack_read_channel</code> with <code>oldest</code> and <code>latest</code>) and threads (<code>slack_read_thread</code>). <cite><code>skills/inbox/references/capture.md</code>, "Slack"; the Slack connector's tool list in the session</cite></li>
+      <li>The plan and the Worklog are in English; so are the titles of cards created by capture, while cards added by hand keep their language. <cite><code>skills/morning/SKILL.md</code>:156; <code>skills/inbox/references/processing.md</code>:76</cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Changing anything in Slack: marking to-dos as completed, clearing them, reactions.</li>
+      <li>To-dos without a message (typed by hand in the To-dos tab): the search returns only messages and files.</li>
+      <li>The Saved section in Slack: <code>is:saved</code> returns no results, so capture stops reading it.</li>
+      <li>The other capture sources (DMs, mentions, channels, GitHub, Gmail).</li>
+      <li>Knowledge sources other than Slack to-dos and channels (e.g. meeting transcripts, email, pages given by link).</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Scope">
+    <p class="q">Which to-dos does capture take?</p>
+    <spec-option value="A" chosen label="From messages of the last 30 days" recommended>On every run capture reads the to-dos whose message is at most 30 days old (about 30 items today) and takes those that are not in Notion yet. The backlog stays in Slack. An old message added to To-dos today is not caught.</spec-option>
+    <spec-option value="B" label="All of them">The first run creates more than 180 cards in the Inbox (also from completed to-dos), and every later run goes through the whole list. Complete, but slow and with a large one-time queue.</spec-option>
+    <spec-option value="C" label="Only new ones from today">The first run creates nothing, it only remembers the current to-dos. After that it works like the 30-day variant.</spec-option>
+    <p class="note">Additional information: at the very beginning go through all of them (ALL TO-DOS) and build a knowledge base from them. Save it in several md files. The first task is to decide how many such md files we need, and then to assign the cards to those files.</p>
+    <p class="why">Recommended option accepted for the regular capture: to-dos from messages of the last 30 days. The note adds a step at the very beginning: a review of all to-dos and a knowledge base in several md files (first the list of files, then the assignment of the items). <a href="#D6">D6</a>–<a href="#D16">D16</a> settle the details of this step.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Triage">
+    <p class="q">Where is it decided what a captured item is?</p>
+    <spec-option value="A" chosen label="On the Inbox page" recommended>Every to-do becomes a card in the Inbox, and the AI proposes the outcome: a task (as today), "Reading list" or "Reference". You fix only what was judged wrong. One flow for everything.</spec-option>
+    <spec-option value="B" label="Already at capture">The AI splits at once: tasks to the Inbox, articles to the reading list, information to the notes, with no review. Less clicking, but mistakes pass unnoticed, and capture changes more in Notion than today.</spec-option>
+    <p class="why">Recommended option accepted: every captured to-do becomes a card in the Inbox and the AI proposes the outcome; the user corrects it.</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Reading">
+    <p class="q">Where do articles and interesting messages go?</p>
+    <spec-option value="A" chosen label="One Reading list page" recommended>A bullet is appended to one page in Notion: the title, the link and one sentence on why to read it. The Inbox card goes to the trash, as with Agenda. Next Actions stays clean, you read in bulk. You create the page once and put its address into the config.</spec-option>
+    <spec-option value="B" label="A separate Someday/Maybe card">Every article is a "Read: …" card with no commitment. They can be planned one by one, but the database grows.</spec-option>
+    <spec-option value="C" label="A separate Next Actions card">As today: a card with an estimate in Next Actions. Every article becomes a commitment.</spec-option>
+    <p class="why">Recommended option accepted: one "Reading list" page in Notion with appended bullets; the Inbox card goes to the trash. The user creates the page and puts its address into the config.</p>
+    </spec-decision>
+
+    <spec-decision did="D4" round="1" from="Q4" topic="Information" superseded-by="D11">
+    <p class="q">Where does important information go?</p>
+    <spec-option value="A" chosen label="One Reference page" recommended>A bullet is appended to one page in Notion with the date, the source (channel, author), a short quote and the link. It can be found later with the Notion search. You create the page once and put its address into the config.</spec-option>
+    <spec-option value="B" label="A separate Icebox card">Every piece of information is a card with the status Icebox (the existing outcome "parked, keep for reference"), with a project if one fits. Easier to find by project, but the task database grows by notes.</spec-option>
+    <spec-option value="C" label="It stays in Slack">Nothing goes to Notion: the Inbox card goes to the trash, and you move the message to Saved in Slack if you want to keep it.</spec-option>
+    <p class="why">Recommended option accepted: one "Reference" page in Notion with appended bullets. The knowledge base from the note to <a href="#D1">D1</a> changed this in <a href="#D11">D11</a>.</p>
+    </spec-decision>
+
+    <spec-decision did="D5" round="1" from="Q5" topic="Morning">
+    <p class="q">What about To-dos in the day plan?</p>
+    <spec-option value="A" chosen label="Only fresh ones" recommended>Morning reads the to-dos from messages since the last workday as candidates for Needs attention. It sees the rest through the cards in Notion.</spec-option>
+    <spec-option value="B" label="Not at all">Morning does not read Slack To-dos; they reach the plan only through the Inbox and Notion.</spec-option>
+    <p class="why">Recommended option accepted: Morning reads only the to-dos from messages since the last workday; it sees the rest through the cards in Notion.</p>
+    </spec-decision>
+
+    <spec-decision did="D6" round="2" from="Q6" topic="Knowledge base">
+    <p class="q">Where do the md files of the knowledge base live?</p>
+    <spec-option value="A" chosen label="~/.ai/worklog/knowledge/" recommended>Locally next to the Worklog (a local git repo with no remote), visible on the host too. The path is in the config.</spec-option>
+    <spec-option value="B" label="Another folder">E.g. the folder with your notes; give the path in the note to this question.</spec-option>
+    <p class="why">Recommended option accepted: the files live locally in <code>~/.ai/worklog/knowledge/</code>, outside the public repo; the path is in the config.</p>
+    </spec-decision>
+
+    <spec-decision did="D7" round="2" from="Q7" topic="Knowledge base">
+    <p class="q">What from the to-dos goes into the knowledge base?</p>
+    <spec-option value="A" chosen label="Knowledge in topic files, requests on a separate list" recommended>The topic files get agreements, explanations and materials (articles, recordings, tools, documents). Requests and tasks are not knowledge: they land in one separate file as a list (when, who, what about, link), so that you can go through it.</spec-option>
+    <spec-option value="B" label="Everything in topic files">Requests and tasks too, next to their topic. A full picture of the topic, but knowledge mixes with outdated requests.</spec-option>
+    <spec-option value="C" label="Only knowledge">Requests and tasks are left out completely.</spec-option>
+    <p class="why">Recommended option accepted: agreements, explanations and materials in topic files, requests and tasks as a list in one separate file. The capture of the last 30 days creates cards only for the to-dos that the review did not store as knowledge.</p>
+    </spec-decision>
+
+    <spec-decision did="D8" round="2" from="Q8" topic="Knowledge base">
+    <p class="q">How is the list of files made?</p>
+    <spec-option value="A" chosen label="The AI proposes, you approve" recommended>The AI reads all to-dos, shows the proposed list of files (name, what it holds, how many items) and waits for approval or corrections. Only then does it assign the items and write the files.</spec-option>
+    <spec-option value="B" label="The AI decides on its own">It settles the list at once and writes the files; you make corrections later in the files or in the next run.</spec-option>
+    <p class="why">Recommended option accepted: the AI proposes the list of files with the number of items and waits for approval, only then does it assign the items and write the files.</p>
+    </spec-decision>
+
+    <spec-decision did="D9" round="2" from="Q9" topic="Knowledge base">
+    <p class="q">What does an entry in a file hold?</p>
+    <spec-option value="A" label="What is in Slack" recommended>The date, the channel and the author, a summary in 1–3 sentences, a short quote, the links from the message and the link to the thread. The thread is read when it is a question or a discussion, to store the answer too.</spec-option>
+    <spec-option value="B" chosen label="Also summaries of the linked pages">As above, and for public links (articles, documentation) a summary of the page is added. A richer base, but several dozen page fetches and a longer run.</spec-option>
+    <p class="why">The entries also hold summaries of the linked pages. This applies only to public pages; links to company systems are stored without fetching, and the fetched content is data, not instructions. The run is longer.</p>
+    </spec-decision>
+
+    <spec-decision did="D10" round="2" from="Q10" topic="Knowledge base">
+    <p class="q">What language is the knowledge base in?</p>
+    <spec-option value="A" chosen label="English" recommended>Summaries in English, like the rest of the Worklog; quotes stay in the original.</spec-option>
+    <spec-option value="B" label="Polish">Summaries in Polish; quotes stay in the original.</spec-option>
+    <spec-option value="C" label="The language of the message">The summary is in the language the message was written in.</spec-option>
+    <p class="why">Recommended option accepted: summaries in English, quotes in the original.</p>
+    </spec-decision>
+
+    <spec-decision did="D11" round="2" from="Q11" topic="Information">
+    <p class="q">Where does new important information go once the knowledge base exists?</p>
+    <spec-option value="A" chosen label="To the knowledge base" recommended>The outcome "Reference" on the Inbox page appends an entry to the matching md file (the AI proposes the file) instead of to a page in Notion. One place for knowledge. Supersedes D4.</spec-option>
+    <spec-option value="B" label="To the Reference page in Notion">As in D4; the md files are a one-time archive of the backlog.</spec-option>
+    <spec-option value="C" label="To both places">An entry in the md file and a bullet on the page in Notion. Nothing gets lost, but the same thing is in two places.</spec-option>
+    <p class="why">Recommended option accepted: the outcome "Reference" on the Inbox page appends an entry to the matching file of the knowledge base. Supersedes <a href="#D4">D4</a>.</p>
+    </spec-decision>
+
+    <spec-decision did="D12" round="2" from="Q12" topic="Knowledge base">
+    <p class="q">How is the review of all to-dos started?</p>
+    <spec-option value="A" chosen label="A separate skill mode, repeatable" recommended>E.g. <code>/daily-workflow:inbox knowledge</code>: the first run builds the base, later runs append only the to-dos that are not in it yet. It also catches old messages added to To-dos later.</spec-option>
+    <spec-option value="B" label="Once, at rollout">I do the review once as part of the implementation, with no mode in the plugin. Less code, but it cannot be repeated with one command.</spec-option>
+    <p class="note">Actually, let the knowledge be taken from various sources: to-dos, but it can also be based on messages in a channel.</p>
+    <p class="why">Recommended option accepted: a separate, repeatable skill mode. The note widens the sources of knowledge: besides the to-dos also messages from channels. Details in <a href="#D13">D13</a>–<a href="#D16">D16</a>.</p>
+    </spec-decision>
+
+    <spec-decision did="D13" round="3" from="Q13" topic="Knowledge sources">
+    <p class="q">Which channels does the knowledge base take messages from?</p>
+    <spec-option value="A" label="The channel given in the command" recommended>E.g. <code>/daily-workflow:inbox knowledge #channel</code>: on demand, one channel at a time. With no argument the mode takes only the to-dos. You control what goes into the base.</spec-option>
+    <spec-option value="B" chosen label="The followed channels">On every run of the mode the channels from <code>[slack].channels</code> are read, the same ones as in capture. It fills up by itself, but the base also gets what you did not pick.</spec-option>
+    <spec-option value="C" label="A separate list in the config">A new list of channels only for the knowledge base, read on every run of the mode.</spec-option>
+    <p class="why">Every run of the knowledge mode reads the to-dos and the followed channels from <code>[slack].channels</code>, the same list capture uses. No new config list and no channel argument; the base also gets what the user did not pick by hand.</p>
+    </spec-decision>
+
+    <spec-decision did="D14" round="3" from="Q14" topic="Knowledge sources">
+    <p class="q">What period of channel messages?</p>
+    <spec-option value="A" chosen label="Since the last run, the first time 30 days" recommended>The first run for a channel takes the last 30 days or the period given in the command; later runs take only what arrived since the previous one.</spec-option>
+    <spec-option value="B" label="Always the period from the command">You say every time from when to read. Full control, but you have to remember what was already read.</spec-option>
+    <spec-option value="C" label="The whole history on the first run">The full archive of the channel. On a large channel that is thousands of messages and a very long run.</spec-option>
+    <p class="why">Recommended option accepted: the first run for a channel takes the last 30 days or the period given in the command, later runs only what arrived since the previous one.</p>
+    </spec-decision>
+
+    <spec-decision did="D15" round="3" from="Q15" topic="Knowledge sources">
+    <p class="q">Which channel messages become knowledge?</p>
+    <spec-option value="A" chosen label="The AI picks what is worth keeping" recommended>Agreements, explanations, answers to questions and links to materials; one entry per thread. It skips ongoing chat, requests and bot notifications. When an entry fits no file, the AI proposes a new one and waits for approval.</spec-option>
+    <spec-option value="B" label="Every thread">All threads of the channel summarised in the base. Nothing slips through, but a lot of noise.</spec-option>
+    <spec-option value="C" label="Only threads with links">Only threads with a link to an article, a document or a tool go into the base.</spec-option>
+    <p class="why">Recommended option accepted: the AI picks agreements, explanations, answers to questions and links to materials, one entry per thread, and skips ongoing chat, requests and bot notifications. A new file is proposed and waits for approval when an entry fits none.</p>
+    </spec-decision>
+
+    <spec-decision did="D16" round="3" from="Q16" topic="Knowledge sources">
+    <p class="q">Does "various sources" mean more than Slack?</p>
+    <spec-option value="A" chosen label="Only Slack: to-dos and channels" recommended>The scope of this spec. Other sources can be added separately when they are needed.</spec-option>
+    <spec-option value="B" label="Other sources too">List them in the note (e.g. meeting transcripts, email, pages given by link).</spec-option>
+    <p class="why">Recommended option accepted: the knowledge base is built only from Slack to-dos and channels. Other sources are out of scope.</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-27-inbox-slack-todos-triage.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>

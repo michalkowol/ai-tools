@@ -43,7 +43,15 @@ view_overdue = "view://00000000-0000-0000-0000-000000000002"
 view_waiting_for = "view://00000000-0000-0000-0000-000000000003"
 view_agenda_errands = "view://00000000-0000-0000-0000-000000000004"
 view_inbox = "view://00000000-0000-0000-0000-000000000005"
+# Page for the Inbox outcome "Reading list": every article or recording to read later is appended to it as a bullet.
+# Create an empty page in Notion and paste its URL. Empty = the outcome is skipped.
+reading_list = ""
 
 [jira]
 # Jira site; ticket links are <base_url>/browse/<KEY>.
 base_url = "https://example.atlassian.net"
+
+[knowledge]
+# Folder of the knowledge base: md files built by /daily-workflow:inbox knowledge from Slack to-dos and the
+# followed channels, and by the Inbox outcome "Reference". Relative to ~/.ai/worklog, or an absolute path.
+dir = "knowledge"
