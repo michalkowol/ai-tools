@@ -4,6 +4,7 @@
 
 | Date | Title | Status | File |
 |------|-------|--------|------|
+| 2026-11-27 | Rename briefing to morning | implemented | [2026-11-27-rename-briefing-to-morning.html](specs/2026-11-27-rename-briefing-to-morning.html) |
 | 2026-11-27 | Inbox: calendar date picker, the Calendar status and Reminder equal to Due Date | implemented | [2026-11-27-inbox-dates-and-calendar.html](specs/2026-11-27-inbox-dates-and-calendar.html) |
 | 2026-11-27 | Briefing plan page: html-spec style and web components | implemented | [2026-11-27-briefing-plan-page-redesign.html](specs/2026-11-27-briefing-plan-page-redesign.html) |
 | 2026-11-26 | Inbox: flag two-minute tasks clearly | implemented | [2026-11-26-inbox-two-minute-rule.html](specs/2026-11-26-inbox-two-minute-rule.html) |

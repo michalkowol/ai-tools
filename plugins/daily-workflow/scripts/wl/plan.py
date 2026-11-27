@@ -128,7 +128,7 @@ def render(plan: dict[str, Any], file_label: str = "") -> str:
     out: list[str] = []
 
     eyebrow = " · ".join(
-        x for x in (plan.get("date"), f"{mode} briefing", "after daily" if stage == "post-daily" else None,
+        x for x in (plan.get("date"), f"{mode} plan", "after daily" if stage == "post-daily" else None,
                     plan.get("day_class")) if x
     )
     acts = "".join(

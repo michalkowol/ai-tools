@@ -5,7 +5,7 @@ Personal Claude Code plugin with three parts that share one local Worklog:
 - **Work Logger**: hooks write a Technical Checkpoint after every response and after git, PR, test and Jira events,
   without any LLM. A detached headless Haiku call turns them into Worklog Entries every 15 minutes of work and before
   compaction. `/daily-workflow:worklog` forces it now.
-- **Daily Briefing**: `/daily-workflow:briefing` plans the day before the daily, `update` corrects it from the daily
+- **Morning**: `/daily-workflow:morning` plans the day before the daily, `update` corrects it from the daily
   transcript and schedules the Deep Work block, `home` plans home tasks.
 - **Inbox**: `/daily-workflow:inbox` captures unanswered Slack messages, saved Slack items, PRs waiting for review,
   own PRs that need action and important email into the Notion GTD Inbox, then renders the whole Inbox as an HTML
@@ -17,7 +17,7 @@ Personal Claude Code plugin with three parts that share one local Worklog:
 ### Connectors
 
 - Notion: install [makenotion/claude-code-notion-plugin](https://github.com/makenotion/claude-code-notion-plugin).
-- Sign in to the claude.ai connectors used by the briefing: Google Calendar, Gmail, Slack, Atlassian.
+- Sign in to the claude.ai connectors used by Morning: Google Calendar, Gmail, Slack, Atlassian.
 - `gh` needs the token described in the `ai` README (`repo`, `read:org`).
 
 ### Config
@@ -33,10 +33,10 @@ and check `[workday]`.
 |---|---|
 | `/daily-workflow:worklog` | checkpoint and summary of this session now, prints the new entries |
 | `/daily-workflow:worklog today`, `… jira PROJ-1234` | read the Worklog |
-| `/daily-workflow:briefing` | morning plan: catch-up of unsummarized sessions, sources, plan, `open …` command for the host |
-| `/daily-workflow:briefing update` | after the daily: reads `~/.ai/worklog/meetings/<date>*.txt`, corrects the plan, creates the Deep Work block |
-| `/daily-workflow:briefing home` | home tasks from Calendar and Notion, no work sources, no calendar block |
-| `/daily-workflow:briefing done …` | the prompt copied from the plan page: marks the ticked items done, Notion cards get Done (today) |
+| `/daily-workflow:morning` | morning plan: catch-up of unsummarized sessions, sources, plan, `open …` command for the host |
+| `/daily-workflow:morning update` | after the daily: reads `~/.ai/worklog/meetings/<date>*.txt`, corrects the plan, creates the Deep Work block |
+| `/daily-workflow:morning home` | home tasks from Calendar and Notion, no work sources, no calendar block |
+| `/daily-workflow:morning done …` | the prompt copied from the plan page: marks the ticked items done, Notion cards get Done (today) |
 | `/daily-workflow:inbox` | capture into the Notion Inbox, then the processing page with a proposal for every Inbox card |
 | `/daily-workflow:inbox process` | only the processing page, no capture |
 | `/daily-workflow:inbox apply …` | the prompt copied from the processing page: applies the answers to Notion |
@@ -62,7 +62,7 @@ Capture creates new Inbox cards without asking. Every other Notion change comes 
   state/cursors/<session>.json            summary cursor, written by the summarizer only
   entries/YYYY-MM/<session>.jsonl         Worklog Entries, one file per session
   days/YYYY-MM-DD.md                      generated day view
-  plans/YYYY-MM-DD[-home].json|html       briefing plans
+  plans/YYYY-MM-DD[-home].json|html       day plans
   plans/assets/                           plan page style and components, copied on every render
   inbox/YYYY-MM-DD-HHMM.json|html          inbox processing pages
   inbox/assets/                           page components, copied from the plugin on every render
@@ -84,7 +84,7 @@ Every file has a single writer, so parallel sessions in separate containers neve
   `worklog.py summarize` detached. It calls `claude -p` with Haiku, no tools, no MCP, hooks disabled and a JSON
   schema.
 - `SessionEnd` only writes the final checkpoint: the container stops with the session. The catch-up at the
-  start of the briefing (`summarize --all`) picks it up.
+  start of Morning (`summarize --all`) picks it up.
 - Logs: `~/.ai/worklog/logs/worklog.log`, `summarizer.log`.
 
 ## Tests

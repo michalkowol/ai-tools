@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Rename briefing to morning</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-27" status="implemented">
+    <h1>Rename briefing to morning</h1>
+    <p>The <code>/daily-workflow:briefing</code> skill in the daily-workflow plugin is renamed to <code>morning</code>.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>The user wants to rename the <code>briefing</code> skill in the daily-workflow plugin to <code>morning</code>.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <ul>
+      <li>Skill: <code>plugins/daily-workflow/skills/briefing/</code> with <code>SKILL.md</code> (<code>name: briefing</code>, modes: none, <code>update</code>, <code>home</code>, <code>done &lt;file&gt;</code>) and <code>references/</code> (<code>sources.md</code>, <code>gtd-rules.md</code>, <code>plan-schema.md</code>). <cite><code>skills/briefing/SKILL.md</code></cite></li>
+      <li>Inbox refers to <code>../briefing/references/gtd-rules.md</code>. <cite><code>skills/inbox/SKILL.md</code>:17</cite></li>
+      <li>The "Copy done" prompt on the plan page: <code>/daily-workflow:briefing done &lt;file&gt;</code>; tests check this text. <cite><code>scripts/wl/assets/plan.js</code>:32, <code>tests/plan_logic.test.js</code>, <code>tests/test_worklog.py</code></cite></li>
+      <li>"briefing" appears 40 times in the plugin and twice outside it (<code>.claude-plugin/marketplace.json</code>, the root <code>README.md</code>). In the plugin: the skill's own <code>SKILL.md</code> (9), <code>gtd-rules.md</code> (2) and <code>sources.md</code> (2); <code>README.md</code> (9); <code>config.example.toml</code> (2); <code>plugin.json</code> (description and keyword); <code>scripts/worklog.py</code> (the module docstring twice and two argparse <code>help</code> texts); docstrings in <code>views.py</code> (2), <code>github.py</code> and <code>collector.py</code>; the <code>{mode} briefing</code> eyebrow in <code>plan.py</code> ("work briefing", "home briefing"); <code>plan.js</code> and its two tests; <code>skills/inbox/SKILL.md</code> and <code>skills/inbox/references/processing.md</code>. <cite><code>grep -rnio briefing</code>, 2026-11-27</cite></li>
+      <li>17 of these are the common noun in prose, e.g. "Views used by the briefing", "the briefing plans the day", "pull request data for the briefing", "briefing plans". <cite><code>README.md</code>:20, 65, 87; <code>config.example.toml</code>:24; <code>worklog.py</code>:8, 9, 288, 300; <code>views.py</code>:42, 96; <code>github.py</code>:1; <code>collector.py</code>:185; <code>processing.md</code>:91; <code>gtd-rules.md</code>:41, 68; <code>sources.md</code>:5, 35</cite></li>
+      <li>"morning" already names the default mode and the stage before the daily: the plan JSON has <code>"stage": "morning"</code> (next to <code>post-daily</code>); <code>SKILL.md</code> has the "morning, work" mode, the "Morning (no argument)" section and "the morning flow"; "the morning plan" means the plan from before the daily; the <code>plugin.json</code> description reads "Daily Briefing (morning plan, post-daily update and home mode …)". <cite><code>skills/briefing/references/plan-schema.md</code>:15, 63, 79; <code>skills/briefing/SKILL.md</code>:22, 23, 29, 57; <code>plugin.json</code>:4</cite></li>
+      <li><code>render-plan</code> re-renders every <code>plans/*.json</code> and copies <code>plan.js</code>, which builds the prompt, so old pages get the new prompt. <cite><code>scripts/wl/plan.py</code> <code>render_file</code></cite></li>
+      <li>No plan page with a "Copy done" prompt exists yet on the user's machine: <code>~/.ai/worklog/plans/</code> has no <code>assets/</code> folder and its pages do not load <code>plan.js</code> (the prompt exists since plugin 0.3.4). <cite><code>ls ~/.ai/worklog/plans/</code>, 2026-11-27; commit <code>bcc8229</code></cite></li>
+      <li>The environment has an <code>anthropic-skills:morning</code> skill ("morning brief"); its description says it runs when the user invokes <code>/morning</code> by name. <cite>skill list in the session</cite></li>
+      <li>The user's local <code>~/.ai/worklog/config.toml</code> carries the same two comments as <code>config.example.toml</code> (lines 1 and 24); it is outside the repo. <cite><code>grep -ni briefing ~/.ai/worklog/config.toml</code></cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Existing specs in <code>.agents/docs/specs/</code> and their titles in <code>INDEX.md</code> stay unchanged (history).</li>
+      <li>Data paths (<code>~/.ai/worklog/plans/</code>) and plan JSON fields, including <code>stage</code>.</li>
+      <li>Changes to the skill's behaviour beyond the name.</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Scope">
+    <p class="q">How far does the rename go?</p>
+    <spec-option value="A" chosen label="Everywhere" recommended>Folder and skill name (<code>skills/morning/</code>, <code>/daily-workflow:morning</code>), the "Copy done" prompt (<code>/daily-workflow:morning done …</code>), the name in the README, plugin and marketplace descriptions ("Morning" instead of "Daily Briefing"), the plan page text ("work briefing" → "work plan"), docstrings and comments. One name everywhere.</spec-option>
+    <spec-option value="B" label="Only the command and the prompt">Folder, skill name and the "Copy done" prompt. Descriptions and texts keep "Daily Briefing". A smaller change, but two names for the same thing.</spec-option>
+    <p class="why">Recommended option accepted: one name everywhere in the plugin, the marketplace and the root README.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Modes">
+    <p class="q">What about the <code>update</code>, <code>home</code> and <code>done</code> modes?</p>
+    <spec-option value="A" chosen label="They stay under morning" recommended><code>/daily-workflow:morning update</code>, <code>… home</code>, <code>… done &lt;file&gt;</code>. One skill, the same rules and sources.</spec-option>
+    <spec-option value="B" label="home as a separate skill">A new <code>/daily-workflow:home</code> for the home plan, <code>update</code> and <code>done</code> stay under morning. Clearer names, but two skills share the plan rules.</spec-option>
+    <p class="why">Recommended option accepted, although "morning update" runs after the daily and "morning home" may sound odd: the modes stay as they are, only the skill name changes. The wording is settled in <a href="#D5">D5</a>.</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Compatibility">
+    <p class="q">Should the old <code>briefing</code> command keep working?</p>
+    <spec-option value="A" chosen label="No, no alias" recommended>A personal plugin, one user. An old prompt copied before the change can be fixed by hand.</spec-option>
+    <spec-option value="B" label="An alias for a few versions">A small <code>briefing</code> skill that only forwards to <code>morning</code> (with the same arguments). Nothing breaks, but code stays to remove later.</spec-option>
+    <p class="why">Recommended option accepted: no alias; plan pages get the new prompt on the next render anyway.</p>
+    </spec-decision>
+
+    <spec-decision did="D4" round="1" from="Q4" topic="Name">
+    <p class="q">What about the collision with the existing "morning" skill?</p>
+    <spec-option value="A" chosen label="Name morning, always with the prefix" recommended>The skill is named <code>morning</code>, called as <code>/daily-workflow:morning</code>; the skill description has no generic phrases like "morning brief", but "day plan", "plan dnia", Deep Work. Matches the request, the collision only with a bare <code>/morning</code>.</spec-option>
+    <spec-option value="B" label="Another name, e.g. morning-plan">No collision, but not the name you asked for.</spec-option>
+    <p class="why">Recommended option accepted: the name <code>morning</code>, documented with the <code>daily-workflow:</code> prefix, and a description that does not compete with <code>anthropic-skills:morning</code>.</p>
+    </spec-decision>
+
+    <spec-decision did="D5" round="2" from="Q5" topic="Wording">
+    <p class="q">How to tell the skill name "Morning" from the "morning" stage in the texts, and what replaces the noun "the briefing"?</p>
+    <spec-option value="A" chosen label="Proper name Morning, noun the day plan, stage morning in lowercase" recommended>The skill is the proper name "Morning"; the noun "the briefing" becomes "the day plan"; the stage keeps the lowercase <code>morning</code>.</spec-option>
+    <p class="why">Proposed after a review of the finalized spec and accepted. It refines <a href="#D1">D1</a>: where "briefing" names the skill, the text says "Morning"; where it means what the skill produces, it says "the day plan". Lowercase "morning" keeps its one meaning, the stage before the daily (<code>stage: "morning"</code>, "the morning plan"). Where both would stand next to each other (the "Morning (no argument)" section, the <code>plugin.json</code> description), the stage wording is rephrased.</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-27-rename-briefing-to-morning.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>

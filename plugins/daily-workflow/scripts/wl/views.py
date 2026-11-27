@@ -39,7 +39,7 @@ def entries(
 
 def open_threads(since: dt.date) -> list[dict[str, Any]]:
     """The latest entry of every session since `since` that is not done or has
-    next steps or blockers: unfinished work for the briefing."""
+    next steps or blockers: unfinished work for the day plan."""
     latest: dict[str, dict[str, Any]] = {}
     for row in entries(since):
         latest[row["session_id"]] = row
@@ -93,7 +93,7 @@ def write_day(day: str) -> None:
 
 
 def context(today: dt.date) -> dict[str, Any]:
-    """Worklog context for the briefing: entries since the last workday and open threads."""
+    """Worklog context for the day plan: entries since the last workday and open threads."""
     since = core.last_workday(today)
     return {
         "today": today.isoformat(),

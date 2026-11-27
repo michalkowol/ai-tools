@@ -23,7 +23,7 @@ test('pending ticks skip items the JSON already marks done', () => {
 
 test('prompt has the done header and one line per item', () => {
   const lines = L.prompt('plans/2026-11-26.json', items.slice(0, 2)).split('\n');
-  assert.equal(lines[0], '/daily-workflow:briefing done plans/2026-11-26.json');
+  assert.equal(lines[0], '/daily-workflow:morning done plans/2026-11-26.json');
   assert.deepEqual(JSON.parse(lines[2]), { key: 'code_review|https://github.com/org/shop/pull/412', label: 'org/shop#412 Batch' });
   assert.equal(lines.length, 3);
 });

@@ -1,4 +1,4 @@
-# Worklog and Daily Briefing configuration.
+# Worklog and Morning configuration.
 # Copied to ~/.ai/worklog/config.toml on first use. Edit that copy.
 
 [worklog]
@@ -21,7 +21,7 @@ daily_event_title = "Daily"
 min_minutes = 90
 target_minutes = 120
 event_title = "Deep Work"
-# Marker in the event description, so the briefing only ever changes its own events.
+# Marker in the event description, so Morning only ever changes its own events.
 event_marker = "[daily-workflow:deep-work]"
 
 [github]

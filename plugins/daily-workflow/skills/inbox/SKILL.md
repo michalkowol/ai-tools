@@ -14,7 +14,7 @@ CLI: `python3 "${CLAUDE_SKILL_DIR}/../../scripts/worklog.py"` (below: `worklog`)
 Config: `~/.ai/worklog/config.toml` (`[slack]`, `[github]`, `[notion]`). Read it first.
 Read before starting: [capture.md](references/capture.md) (sources and cards), [processing.md](references/processing.md)
 (page JSON and how answers are applied), and the Notion model in
-[gtd-rules.md](../briefing/references/gtd-rules.md).
+[gtd-rules.md](../morning/references/gtd-rules.md).
 
 ## Modes
 

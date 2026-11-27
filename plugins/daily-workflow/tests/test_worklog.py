@@ -321,6 +321,8 @@ class PlanTest(WorklogTestCase):
         self.assertNotIn("javascript:", page)
         self.assertIn('href="https://slack.com/x"', page)
         self.assertIn("proposed, created after the daily", page)
+        self.assertIn("2026-11-23 · work plan", page)
+        self.assertNotIn("briefing", page)
         self.assertIn("Missing sources", page)
         self.assertNotIn("Resolved", page)
 
@@ -367,7 +369,7 @@ class PlanChecksTest(WorklogTestCase):
     def test_plan_done_marks_items_and_rerenders(self):
         path = self.write_plan(self.plan_data())
         lines = "\n".join([
-            "/daily-workflow:briefing done plans/2026-11-26.json",
+            "/daily-workflow:morning done plans/2026-11-26.json",
             json.dumps({"key": "priorities|https://www.notion.so/a", "label": "Task A"}),
             json.dumps({"key": "agenda|15:00 1:1 Alice|Promotion plan", "label": "Promotion plan"}),
             json.dumps({"key": "resolved|gone", "label": "Gone"}),

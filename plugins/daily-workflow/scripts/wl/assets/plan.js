@@ -29,7 +29,7 @@
       return items.filter((i) => !i.done && ticks[i.key]);
     },
     prompt(file, items) {
-      return ['/daily-workflow:briefing done ' + file]
+      return ['/daily-workflow:morning done ' + file]
         .concat(items.map((i) => JSON.stringify({ key: i.key, label: i.label })))
         .join('\n');
     },

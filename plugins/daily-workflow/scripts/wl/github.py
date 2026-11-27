@@ -1,4 +1,4 @@
-"""Collects pull request data for the briefing with gh, as one JSON document."""
+"""Collects pull request data for the day plan with gh, as one JSON document."""
 from __future__ import annotations
 
 import json

@@ -2,7 +2,7 @@
 
 `<since>` is `last_workday` from `worklog dates` (Monday → Friday), `<today>` and `<tomorrow>` come from the
 same command. Run independent sources in parallel. A source that fails or is not connected goes to
-`missing_sources` with a short reason and the briefing continues.
+`missing_sources` with a short reason and Morning continues.
 
 ## Worklog (work mode)
 
@@ -32,7 +32,7 @@ same command. Run independent sources in parallel. A source that fails or is not
 - Free windows: between `[workday].start` and `[workday].end`, outside meetings, leaving 10 min buffers around them.
 - The daily: an event today whose title contains `[workday].daily_event_title`.
 - Changes: cancelled events, conflicts that went away → Resolved. New overlapping events → Needs attention.
-- Deep Work events created by the briefing carry `[deep_work].event_marker` in the description. Never change any
+- Deep Work events created by Morning carry `[deep_work].event_marker` in the description. Never change any
   other event.
 
 ## Jira (work mode)

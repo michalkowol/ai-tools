@@ -5,8 +5,8 @@ Usage (the most common ones):
   worklog.py hook <Event>                 # called by Claude Code hooks, JSON on stdin
   worklog.py flush [--session ID]         # /worklog: checkpoint + summary now
   worklog.py summarize --all              # catch-up of every unprocessed session
-  worklog.py context                      # Worklog context for the briefing (JSON)
-  worklog.py github                       # pull request data for the briefing (JSON)
+  worklog.py context                      # Worklog context for the day plan (JSON)
+  worklog.py github                       # pull request data for the day plan (JSON)
   worklog.py render-plan plans/2026-11-23.json
   worklog.py plan-done plans/2026-11-23.json < pasted-lines   # ticks from the plan page
   worklog.py inbox start|check|record       # inbox capture state (JSON)
@@ -285,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--format", choices=("json", "md"), default="json")
     p.set_defaults(func=cmd_entries)
 
-    p = sub.add_parser("context", help="Worklog context for the briefing")
+    p = sub.add_parser("context", help="Worklog context for the day plan")
     p.add_argument("--date")
     p.set_defaults(func=cmd_context)
 
@@ -297,7 +297,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--date")
     p.set_defaults(func=cmd_meetings)
 
-    p = sub.add_parser("github", help="pull request data for the briefing")
+    p = sub.add_parser("github", help="pull request data for the day plan")
     p.set_defaults(func=cmd_github)
 
     p = sub.add_parser("render-plan", help="render a plan JSON into HTML")

@@ -88,7 +88,7 @@ order in the file does not matter.
   shows the card the day before the Due Date); leave it empty or pick an earlier day to start.
 - Calendar: propose `calendar` instead of `next` only when the action can only be done on or from a known day, and
   set the Reminder to that day. Without such a day the card stays `next`.
-- Today and Today candidates: never propose them; the briefing plans the day. The page sets the Reminder to today
+- Today and Today candidates: never propose them; Morning plans the day. The page sets the Reminder to today
   when the user picks one of them on a card without a Reminder.
 - Category: `Work` for captured entries; for entries added by hand judge from the content (`Home`, or both).
 - Project only from existing options, empty when nothing fits. The page shows it read-only; the user changes it

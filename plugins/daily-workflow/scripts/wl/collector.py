@@ -182,7 +182,7 @@ def spawn_summarizer(session_id: str) -> None:
 
 def load_cursor(session_id: str) -> dict[str, Any]:
     """Summary cursor. Kept apart from the session state because the summarizer
-    may run in another container (briefing catch-up) than the session hooks."""
+    may run in another container (the Morning catch-up) than the session hooks."""
     return core.read_json(core.cursors_dir() / f"{session_id}.json", default=None) or {
         "session_id": session_id,
         "last_summarized_seq": 0,

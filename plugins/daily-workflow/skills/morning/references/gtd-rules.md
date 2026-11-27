@@ -38,7 +38,7 @@ In SQL, dates are `date:Reminder:start`, `date:Due Date:start`, and the URL is `
 - Light task: ≤ 1 x 🍅. Heavy task: ≥ 2 x 🍅. `None` for Agenda, Errands and work tracked in Jira.
 - One priority tag per card: P1, P2 or P3. ♻️ Recurring can sit next to it.
 
-## Views used by the briefing
+## Views used by the day plan
 
 - Top (`view_top`): Reminder ≤ today or Due Date ≤ tomorrow, not Done. Main source of candidates.
 - Overdue (`view_overdue`): Reminder or Due Date before today, not Done.
@@ -65,7 +65,7 @@ In SQL, dates are `date:Reminder:start`, `date:Due Date:start`, and the URL is `
 
 - Never change Notion without the user's consent. Show the change plan first, apply after an explicit yes.
 - One exception: the inbox skill's capture creates new cards with Status Inbox without asking. It never changes existing cards; processing applies only what the user filled in on the inbox page.
-- The briefing `done` prompt pasted from the plan page sets Status `Done (today)` on the ticked Notion cards without asking again; it changes nothing else.
+- The Morning `done` prompt pasted from the plan page sets Status `Done (today)` on the ticked Notion cards without asking again; it changes nothing else.
 - Every card must have Status, Category and Estimate, otherwise it lands in the Inbox view.
 - Tags and projects only from existing options. Never create a new project.
 - Propose only the Reminders for today's tasks and the cards for sprint tickets above, nothing else unless the user asks.

@@ -38,7 +38,7 @@ The init also copies the global `style.css` and `global-components.js` to `.agen
 
 ## Plugin `daily-workflow`
 
-Work Logger hooks that record work from parallel Claude Code sessions into a local Worklog (`~/.ai/worklog`), plus `/daily-workflow:briefing` and `/daily-workflow:worklog`. Setup and usage: [plugins/daily-workflow/README.md](plugins/daily-workflow/README.md).
+Work Logger hooks that record work from parallel Claude Code sessions into a local Worklog (`~/.ai/worklog`), plus `/daily-workflow:morning` and `/daily-workflow:worklog`. Setup and usage: [plugins/daily-workflow/README.md](plugins/daily-workflow/README.md).
 
 ## License
 

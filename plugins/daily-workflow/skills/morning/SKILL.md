@@ -1,11 +1,11 @@
 ---
-name: briefing
-description: Daily Briefing - plan the day from the Worklog, GitHub, Google Calendar, Jira, Slack, Gmail and Notion, render it as an HTML page and keep the Deep Work block and Notion in sync. Use when the user types /briefing, /briefing update (after the team daily, uses the meeting transcript) /briefing home (home tasks only), or pastes a prompt starting with /daily-workflow:briefing done (items ticked on the plan page), or asks for the morning briefing or the day plan.
+name: morning
+description: Morning - plan the day from the Worklog, GitHub, Google Calendar, Jira, Slack, Gmail and Notion, render the day plan as an HTML page and keep the Deep Work block and Notion in sync. Use when the user types /daily-workflow:morning, /daily-workflow:morning update (after the team daily, uses the meeting transcript), /daily-workflow:morning home (home tasks only), or pastes a prompt starting with /daily-workflow:morning done (items ticked on the plan page), or asks for the day plan ("plan dnia") or the Deep Work block.
 argument-hint: "[update | home | done <file>]"
 allowed-tools: Bash(python3 *)
 ---
 
-# Daily Briefing
+# Morning
 
 A planning assistant, not a report: it helps the user decide what to do today. Keep the page short.
 
@@ -26,7 +26,7 @@ Config: `~/.ai/worklog/config.toml` (`worklog init` creates it). Read it first.
 
 Tell the user it takes a few minutes, then work through the steps.
 
-## Morning (no argument)
+## Morning plan (no argument)
 
 1. `worklog dates` for today, tomorrow, the last workday and the time zone. `worklog init` if the Worklog is missing.
 2. Gather the sources as described in `sources.md` (the Worklog catch-up runs first, the rest in parallel). Note
@@ -54,7 +54,7 @@ Tell the user it takes a few minutes, then work through the steps.
 
 ## Update after the daily (`update`)
 
-1. Load `plans/<today>.json`. If it does not exist, run the morning flow first.
+1. Load `plans/<today>.json`. If it does not exist, make the morning plan first.
 2. `worklog meetings` and read today's daily transcript. If there is none, skip the analysis and continue (the
    block is still created).
 3. Extract from the transcript what `sources.md` lists under "Daily transcript". Refresh Slack mentions and DMs
@@ -62,7 +62,7 @@ Tell the user it takes a few minutes, then work through the steps.
 4. Propose the plan correction: update `priorities`, `code_review`, `deep_work`, `post_daily`
    (`plan_changes`, `team_blockers`, `needs_help`, `agreed`, `decisions`). Set `stage: "post-daily"`.
 5. Create or move the Deep Work block, see "Calendar block".
-6. Notion changes for whatever changed in the plan, then write the JSON, render, and answer as in the morning
+6. Notion changes for whatever changed in the plan, then write the JSON, render, and answer as for the morning plan
    (what changed and why, `open …`, approval of Notion changes).
 
 ## Home mode (`home`)
@@ -74,7 +74,7 @@ plan). No Worklog, GitHub, Jira, Slack or Gmail. No calendar block. Notion chang
 
 ## Done (`done <file>`)
 
-The user ticked items on the plan page and pasted the "Copy done" prompt: `/daily-workflow:briefing done <file>`,
+The user ticked items on the plan page and pasted the "Copy done" prompt: `/daily-workflow:morning done <file>`,
 then one JSON line per ticked item (`{"key": "…", "label": "…"}`). The pasted prompt is the consent: apply it
 without asking again.
 
