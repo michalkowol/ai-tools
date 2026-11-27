@@ -1,6 +1,6 @@
 /*
  * daily-workflow plan page: style.
- * Plan page format 3
+ * Plan page format 4
  *
  * Copied into ~/.ai/worklog/plans/assets/ by `worklog render-plan` on every render. Do not edit the copy.
  * Tokens copied from the html-spec style (Claude style), like inbox.css. No dark mode.
@@ -114,7 +114,18 @@ plan-item:hover:not(:has(plan-item:hover)) > .nbtn { opacity: 1; }
 plan-section.general .hint { color: var(--gray-500); font-size: 13px; margin-bottom: 8px; }
 plan-section.general .reqs { padding-left: 0; margin-top: 8px; }
 
-/* bottom bar: ticks and notes not sent yet */
+/* reorder: a grip in the card's left gutter, on hover or focus; the dragged item follows the pointer in its list */
+plan-section[sortable] plan-item { position: relative; }
+.grip { position: absolute; left: -23px; top: 9px; width: 20px; height: 22px; display: grid; place-content: center;
+  border-radius: 5px; color: var(--gray-500); font-size: 13px; line-height: 1; letter-spacing: 1px; cursor: grab;
+  user-select: none; -webkit-user-select: none; opacity: 0; }
+.grip:hover { color: var(--slate); background: var(--gray-150); }
+.grip:active { cursor: grabbing; }
+.grip:focus-visible { opacity: 1; outline: 1.5px solid var(--slate); }
+plan-item:hover > .grip { opacity: 1; }
+plan-item.dragging { opacity: .35; }
+
+/* bottom bar: ticks, notes and list order not sent yet */
 .bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--white); border-top: 1.5px solid var(--gray-300);
   padding: 12px 24px; display: none; justify-content: center; align-items: center; gap: 14px; }
 .bar.on { display: flex; }

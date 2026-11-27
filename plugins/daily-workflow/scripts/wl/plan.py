@@ -10,8 +10,9 @@ the "Copy prompt" bar. The key is section + URL, or the text when there is no UR
 localStorage survive a re-render.
 
 `apply_lines` writes what was pasted back from the page into the JSON: `done: true` on object items (the key in
-`done_items` for plain-text items) and the notes for AI in `ai_notes`; `set_results` stores what became of each
-note. The page shows the stored notes with their results under their items."""
+`done_items` for plain-text items), the notes for AI in `ai_notes` and the order of the lists the user rearranged by
+drag and drop (`manual_order` names them); `set_results` stores what became of each note. The page shows the stored
+notes with their results under their items."""
 from __future__ import annotations
 
 import html
@@ -24,10 +25,12 @@ from . import core
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 ASSETS = ("plan.css", "plan.js")
-PAGE_FORMAT = "3"
+PAGE_FORMAT = "4"
 # Key of the note for the whole plan (item keys always contain "|").
 GENERAL_KEY = "plan"
 GENERAL_LABEL = "Whole plan"
+# Lists the user may reorder on the page (task lists; meetings stay in time order).
+SORTABLE = ("priorities", "outside_limit", "code_review", "my_prs", "needs_attention", "tomorrow_prep", "follow_ups")
 
 KIND_LABEL = {"deep": "deep focus", "heavy": "heavy", "light": "light"}
 
@@ -139,7 +142,7 @@ class Checks:
 
 
 def section(name: str, title: str, body: str, cls: str = "") -> str:
-    attrs = f' name="{e(name)}"' + (f' class="{e(cls)}"' if cls else "")
+    attrs = f' name="{e(name)}"' + (f' class="{e(cls)}"' if cls else "") + (" sortable" if name in SORTABLE else "")
     return f"<plan-section{attrs}><h2>{e(title)}</h2>{body}</plan-section>" if body else ""
 
 
@@ -325,11 +328,37 @@ def mark_done(plan: dict[str, Any], keys: list[str]) -> dict[str, Any]:
     return {"done": [found[k] for k in wanted if k in found], "unknown": [k for k in wanted if k not in found]}
 
 
+def reorder(plan: dict[str, Any], section: str, keys: list[str]) -> bool:
+    """Puts the items of one sortable list into the order of `keys`; items that are not listed keep their order
+    after them. False when the section is not a sortable list of the plan."""
+    rows = plan.get(section)
+    if section not in SORTABLE or not isinstance(rows, list):
+        return False
+    rank: dict[str, int] = {}
+    for i, key in enumerate(keys):
+        rank.setdefault(key, i)
+    listed = [r for r in rows if r and item_key(section, r) in rank]
+    rest = [r for r in rows if not (r and item_key(section, r) in rank)]
+    plan[section] = sorted(listed, key=lambda r: rank[item_key(section, r)]) + rest
+    return True
+
+
 def apply_lines(plan: dict[str, Any], lines: list[dict[str, Any]], at: str = "") -> dict[str, Any]:
-    """Applies the lines pasted from the plan page: `done: true` marks the item done, `note` is stored in `ai_notes`
-    with an empty result. Returns the done items and the notes still to carry out (with the item URL and whether
-    the item is still in the plan), and the unknown keys of the ticks."""
+    """Applies the lines pasted from the plan page. Item lines (`key`): `done: true` marks the item done, `note` is
+    stored in `ai_notes` with an empty result. Order lines (`order`, `keys`): the list gets the order the user
+    arranged and is named in `manual_order`. Returns the done items, the notes still to carry out (with the item
+    URL and whether the item is still in the plan), the reordered lists and the unknown keys of the ticks."""
+    reordered = []
+    for line in lines:
+        section = str(line.get("order") or "")
+        keys = line.get("keys")
+        if section and isinstance(keys, list) and reorder(plan, section, [str(k) for k in keys]):
+            reordered.append(section)
+    if reordered:
+        plan["manual_order"] = list(dict.fromkeys(list(plan.get("manual_order") or []) + reordered))
+    lines = [line for line in lines if line.get("key")]
     result = mark_done(plan, [str(line["key"]) for line in lines if line.get("done") is True])
+    result["reordered"] = list(dict.fromkeys(reordered))
     items: dict[str, Any] = {}
     for key, r in all_items(plan):
         items.setdefault(key, r)

@@ -55,6 +55,7 @@ only `http(s)` URLs become links. Write in English.
   "post_daily": {"plan_changes": ["…"], "team_blockers": ["…"], "needs_help": ["…"], "agreed": ["…"], "decisions": ["…"]},
   "notion_changes": [{"card": "PROJ-1250 retry policy", "change": "New card: Work, Estimate None, Reminder 2026-11-23, Due 2026-11-25, URL Jira", "status": "proposed", "url": ""}],
   "ai_notes": [{"id": 1, "key": "follow_ups|https://…", "label": "Ping Erin about the contract", "text": "set the reminder to 1 Dec", "result": "applied: Reminder 2026-12-01", "at": "2026-11-23T10:12:00+01:00"}],
+  "manual_order": ["priorities"],
   "missing_sources": [{"source": "Gmail", "reason": "connector not signed in"}]
 }
 ```
@@ -79,6 +80,11 @@ only `http(s)` URLs become links. Write in English.
   note, with an empty `result`) and `worklog plan-result` (`applied: …`, `skipped: …` or `failed: …`). `key` is the
   item key, or `plan` for the note about the whole plan; `text` is the note (an item's own `note` field is plan text,
   not a note for AI). The page shows them under their items. Keep them when rewriting the plan.
+- The page shows every list in the order of the JSON. In the task lists (`priorities`, `outside_limit`,
+  `code_review`, `my_prs`, `needs_attention`, `tomorrow_prep`, `follow_ups`) the user can reorder the items by drag
+  and drop; `worklog plan-apply` then writes the lists in that order and names them in `manual_order` (top level).
+  Keep `manual_order` and the order of the items in those lists when rewriting the plan (`update`); new items go
+  where they fit.
 - The page puts a checkbox and a "+ note" button on every item. The item key is the section plus the item URL
   (`url`, `source.url` or `event_url`), or its title when there is no URL, so ticks and notes kept in the browser
   survive a re-render. Keep titles and

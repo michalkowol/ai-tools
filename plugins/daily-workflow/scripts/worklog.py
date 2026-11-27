@@ -8,7 +8,7 @@ Usage (the most common ones):
   worklog.py context                      # Worklog context for the day plan (JSON)
   worklog.py github                       # pull request data for the day plan (JSON)
   worklog.py render-plan plans/2026-11-23.json
-  worklog.py plan-apply plans/2026-11-23.json < pasted-lines  # ticks and notes for AI from the plan page
+  worklog.py plan-apply plans/2026-11-23.json < pasted-lines  # ticks, notes for AI and list order from the plan page
   worklog.py plan-result plans/2026-11-23.json < result-lines # what became of the notes for AI
   worklog.py inbox start|check|record       # inbox capture state (JSON)
   worklog.py render-inbox inbox/2026-11-23-0930.json
@@ -189,10 +189,10 @@ def read_json_lines() -> list[dict]:
 
 
 def cmd_plan_apply(args) -> int:
-    """Lines pasted from the plan page ("Copy prompt") on stdin: mark the ticked items done, store the notes for AI
-    in the JSON and re-render."""
+    """Lines pasted from the plan page ("Copy prompt") on stdin: mark the ticked items done, store the notes for AI,
+    apply the order of the rearranged lists in the JSON and re-render."""
     path, label = plan_path(args.path)
-    lines = [line for line in read_json_lines() if line.get("key")]
+    lines = [line for line in read_json_lines() if line.get("key") or line.get("order")]
     data = json.loads(path.read_text(encoding="utf-8"))
     result = plan.apply_lines(data, lines, core.now_iso())
     core.write_json_atomic(path, data)
@@ -324,7 +324,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("path")
     p.set_defaults(func=cmd_render_plan)
 
-    p = sub.add_parser("plan-apply", help="apply the ticks and notes for AI from the plan page (prompt lines on stdin)")
+    p = sub.add_parser("plan-apply", help="apply the ticks, notes for AI and list order from the plan page (prompt lines on stdin)")
     p.add_argument("path")
     p.set_defaults(func=cmd_plan_apply)
 

@@ -62,7 +62,30 @@ test('prune drops ticks the JSON already has and keeps unknown keys', () => {
   assert.deepEqual(L.prune(items, ticks), { 'resolved|gone': true });
 });
 
+test('an arranged order goes on top of the plan order; new items keep their place after it', () => {
+  assert.deepEqual(L.mergeOrder(['a', 'b', 'c', 'new'], ['c', 'gone', 'a', 'c']), ['c', 'a', 'b', 'new']);
+  assert.deepEqual(L.mergeOrder(['a', 'b'], undefined), ['a', 'b']);
+});
+
+test('only lists whose order differs from the plan are pending and stay in storage', () => {
+  const lists = [{ name: 'priorities', keys: ['a', 'b', 'c'] }, { name: 'code_review', keys: ['x', 'y'] }];
+  const orders = { priorities: ['c', 'a', 'b'], code_review: ['x', 'y'], removed_list: ['q'] };
+  assert.deepEqual(L.pendingOrders(lists, orders), [{ order: 'priorities', keys: ['c', 'a', 'b'] }]);
+  assert.deepEqual(L.pruneOrders(lists, orders), { priorities: ['c', 'a', 'b'] });
+  assert.deepEqual(L.pruneOrders(lists, { priorities: ['a', 'b', 'c'] }), {});
+});
+
+test('order lines come last in the prompt and are counted in the summary', () => {
+  const orders = [{ order: 'priorities', keys: ['c', 'a', 'b'] }];
+  const lines = L.lines(items, { 'priorities|https://www.notion.so/a': true }, { plan: 'all' }, [], orders);
+  assert.deepEqual(lines.map((l) => l.order || l.key), ['priorities|https://www.notion.so/a', 'plan', 'priorities']);
+  assert.equal(L.summary(lines), '1 done · 1 note · 1 list reordered');
+  assert.equal(L.summary(L.lines(items, {}, {}, [], orders.concat({ order: 'code_review', keys: [] }))), '2 lists reordered');
+  assert.deepEqual(JSON.parse(L.prompt('plans/x.json', lines).split('\n')[3]), { order: 'priorities', keys: ['c', 'a', 'b'] });
+});
+
 test('storage keys are per plan file', () => {
   assert.equal(L.storageKey('plans/2026-11-26.json'), 'daily-workflow:plan:plans/2026-11-26.json');
   assert.equal(L.notesKey('plans/2026-11-26.json'), 'daily-workflow:plan-notes:plans/2026-11-26.json');
+  assert.equal(L.orderKey('plans/2026-11-26.json'), 'daily-workflow:plan-order:plans/2026-11-26.json');
 });

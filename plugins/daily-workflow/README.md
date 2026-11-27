@@ -36,7 +36,7 @@ and check `[workday]`.
 | `/daily-workflow:morning` | morning plan: catch-up of unsummarized sessions, sources, plan, `open …` command for the host |
 | `/daily-workflow:morning update` | after the daily: reads `~/.ai/worklog/meetings/<date>*.txt`, corrects the plan, creates the Deep Work block |
 | `/daily-workflow:morning home` | home tasks from Calendar and Notion, no work sources, no calendar block |
-| `/daily-workflow:morning apply …` | the prompt copied from the plan page: marks the ticked items done (Notion cards get Done (today)) and carries out the notes for AI |
+| `/daily-workflow:morning apply …` | the prompt copied from the plan page: marks the ticked items done (Notion cards get Done (today)), carries out the notes for AI and keeps the order of the lists you rearranged |
 | `/daily-workflow:inbox` | capture into the Notion Inbox, then the processing page with a proposal for every Inbox card |
 | `/daily-workflow:inbox process` | only the processing page, no capture |
 | `/daily-workflow:inbox apply …` | the prompt copied from the processing page: applies the answers to Notion |
@@ -45,9 +45,11 @@ Drop the daily transcript into `~/.ai/worklog/meetings/` with the date in the na
 Open the plan on the host with the printed command, e.g. `open ~/.ai/worklog/plans/2026-11-23.html`. The header and
 the three acts of the day stay in a left column, the sections are cards with a "2/3" counter. Every item has a
 checkbox and, on hover, a "+ note" button for a note for AI in free text (e.g. "set the reminder to 1 Dec", "move to
-Waiting for"); the last card holds one more field for a note about the whole plan. Ticks and notes are kept in the
-browser, and "Copy prompt" in the bottom bar copies a prompt that marks the ticked items done in the plan and in
-Notion and carries out the notes. The page then shows every note with its result.
+Waiting for"); the last card holds one more field for a note about the whole plan. In the task lists the items can be
+reordered: drag the handle that shows on hover to the left of an item, or focus it and press the arrow keys. Ticks,
+notes and the order are kept in the browser, and "Copy prompt" in the bottom bar copies a prompt that marks the
+ticked items done in the plan and in Notion, carries out the notes and writes the new order into the plan, so
+`update` keeps it. The page then shows every note with its result.
 
 The inbox page works the same way (`open ~/.ai/worklog/inbox/2026-11-23-0930.html`). Each entry starts with the AI
 proposal; `j` / `→` accepts it and moves on, so only change what is wrong: click a field or the title, `e` Done,

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Plan page: reorder items by drag and drop</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-27" status="implemented">
+    <h1>Plan page: reorder items by drag and drop</h1>
+    <p>On the day plan page the order of items can be changed by drag &amp; drop.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>The user wants to be able to modify the plan lightly on the page: change the order by drag &amp; drop.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <ul>
+      <li>The order of items on the page is the order of the lists in the plan JSON; the renderer sorts nothing. The order of the section cards is fixed in the code. <cite><code>plugins/daily-workflow/scripts/wl/plan.py</code> <code>render()</code>:186-241</cite></li>
+      <li>Lists with items: <code>priorities</code>, <code>outside_limit</code>, <code>code_review</code>, <code>my_prs</code>, <code>needs_attention</code>, <code>meetings</code>, <code>tomorrow_prep</code>, <code>follow_ups</code>, <code>resolved</code>, <code>notion_changes</code>; plus the agenda points under a meeting and the lists in "For the daily" and "After the daily". <cite><code>plan.py</code> <code>LIST_SECTIONS</code>, <code>all_items</code></cite></li>
+      <li><code>code_review</code> is ordered (first = review first); the AI orders it with the rule "unblocking the team comes first". <cite><code>skills/morning/references/plan-schema.md</code>:71; <code>skills/morning/SKILL.md</code>:40-41</cite></li>
+      <li>Today's tasks are at most 4 tasks (1 deep focus, 1 heavy, 2 light); their order has no described meaning. <cite><code>references/gtd-rules.md</code>:50</cite></li>
+      <li>The item key is the section + the URL (or the title), not the place in the list, so ticks and notes survive a reorder. <cite><code>plan.py</code> <code>item_key</code>; <code>tests/test_worklog.py</code> <code>test_keys_survive_reordering</code></cite></li>
+      <li>The page has no backend. Ticks and notes live in <code>localStorage</code> and get back through the <code>/daily-workflow:morning apply &lt;file&gt;</code> prompt; <code>worklog plan-apply</code> reads JSON lines with <code>key</code> and <code>done</code> or <code>note</code>. <cite><code>scripts/wl/assets/plan.js</code>:33-38; <code>scripts/worklog.py</code>:195; <code>plan.py</code> <code>apply_lines</code></cite></li>
+      <li><code>update</code> after the daily corrects <code>priorities</code> and <code>code_review</code>; it has to keep <code>done</code>, <code>done_items</code> and <code>ai_notes</code>. <cite><code>SKILL.md</code>, "Update after the daily"; <code>plan-schema.md</code></cite></li>
+      <li>A note for AI can already move, remove or add an item in the plan, in free text. <cite><code>SKILL.md</code>, "Notes for AI"</cite></li>
+      <li>Plan pages have no JS dependencies; earlier specs excluded Alpine.js and other libraries. <code>plan.js</code> and <code>plan.css</code> are copied to <code>plans/assets/</code> and work from <code>file://</code>. <cite><code>.agents/docs/specs/2026-11-24-briefing-plan-checkboxes.html</code> and <code>2026-11-27-briefing-plan-page-redesign.html</code>, Out of scope; <code>plan.py</code> <code>copy_assets</code></cite></li>
+      <li>Every item already has a checkbox on the left and a "+ note" button on the right, visible on hover. <cite><code>plan.js</code> <code>PlanItem</code>; <code>scripts/wl/assets/plan.css</code></cite></li>
+      <li>The Notion database has no order field (fields: Name, Status, Category, Estimate, Tags, Project, Reminder, Due Date, URL). <cite><code>gtd-rules.md</code>, "Fields"</cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Changes in Notion that follow from the order.</li>
+      <li>Editing the content of an item on the page (title, estimate); notes for AI serve that.</li>
+      <li>The Deep Work block and the three acts of the day.</li>
+      <li>The Inbox page.</li>
+      <li>Dragging an item to another section (<a href="#D1">D1</a>) and reordering whole sections (<a href="#D3">D3</a>).</li>
+      <li>Touch screens and a drag and drop library (<a href="#D7">D7</a>).</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Scope">
+    <p class="q">Where can an item be dragged?</p>
+    <spec-option value="A" chosen label="Only inside its section" recommended>Reordering inside one list, e.g. in Today's tasks or Code review order. The item does not change its section, so its fields stay unchanged.</spec-option>
+    <spec-option value="B" label="Also to another section">E.g. from Outside the limit to Today's tasks or from Today's tasks to Prep for tomorrow. Sections have different fields (kind, estimate, repo), so a move needs extra rules or the AI.</spec-option>
+    <p class="why">Recommended option accepted: an item is reordered only inside its own list. Moving it to another section stays possible through a note for AI.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Scope">
+    <p class="q">Which lists can be sorted?</p>
+    <spec-option value="A" chosen label="Task lists" recommended>Today's tasks, Outside the limit, Code review order, My pull requests, Needs attention, Prep for tomorrow, Follow-ups. Not the agenda points, the "For the daily" and "After the daily" lists, Resolved and Notion changes.</spec-option>
+    <spec-option value="B" label="Every list except Meetings">Also the agenda points, "For the daily", "After the daily", Resolved and Notion changes.</spec-option>
+    <spec-option value="C" label="Only Today's tasks and Code review order">The two lists where the order means the order of work.</spec-option>
+    <p class="why">Recommended option accepted: the seven task lists are sortable. Meetings are ordered by time, so they are not sorted in any variant.</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Scope">
+    <p class="q">Can whole sections be reordered too?</p>
+    <spec-option value="A" chosen label="No" recommended>The order of the section cards is fixed, the same on every plan page.</spec-option>
+    <spec-option value="B" label="Yes">Section cards can be dragged too; their order then has to be stored separately.</spec-option>
+    <p class="why">Recommended option accepted: the order of the section cards stays fixed.</p>
+    </spec-decision>
+
+    <spec-decision did="D4" round="1" from="Q4" topic="Storage">
+    <p class="q">Where is the new order stored?</p>
+    <spec-option value="A" chosen label="In the browser right away, in the plan once the prompt is pasted" recommended>The page keeps the order in <code>localStorage</code>. The <code>apply</code> prompt carries it together with the ticks and notes, and <code>worklog plan-apply</code> reorders the lists in the plan JSON. The order is then visible to the AI and survives <code>update</code>.</spec-option>
+    <spec-option value="B" label="Only in the browser">No prompt: the page restores the order every time it opens. The plan JSON does not know it, so the AI does not see it and <code>update</code> may arrange the list its own way.</spec-option>
+    <p class="why">Recommended option accepted. The page has no backend, so the order lives in the browser right away and reaches the plan JSON with the <code>apply</code> prompt, together with the ticks and notes.</p>
+    </spec-decision>
+
+    <spec-decision did="D5" round="1" from="Q5" topic="Storage">
+    <p class="q">Should <code>update</code> after the daily keep the manual order?</p>
+    <spec-option value="A" chosen label="Yes" recommended>Items arranged by hand stay in that order; the AI puts new items where they fit and says in its answer what it changed.</spec-option>
+    <spec-option value="B" label="No">After the daily the AI arranges the lists again by its own rules (e.g. in reviews, unblocking the team first).</spec-option>
+    <p class="why">Recommended option accepted: <code>update</code> keeps the order the user arranged and only places new items.</p>
+    </spec-decision>
+
+    <spec-decision did="D6" round="1" from="Q6" topic="Look">
+    <p class="q">What is the item dragged by?</p>
+    <spec-option value="A" chosen label="A handle on the item" recommended>A small handle visible on hover, like the "+ note" button. Selecting text and the links in the item work as before.</spec-option>
+    <spec-option value="B" label="The whole row">A bigger target, but selecting text in the item gets harder and links are dragged as links.</spec-option>
+    <p class="why">Recommended option accepted: a handle shown on hover, so text selection and links keep working.</p>
+    </spec-decision>
+
+    <spec-decision did="D7" round="1" from="Q7" topic="Technique">
+    <p class="q">How to build the dragging?</p>
+    <spec-option value="A" chosen label="Native browser drag and drop" recommended>No dependency, little code. Works with the mouse; does not work on touch screens, and the animation is simpler.</spec-option>
+    <spec-option value="B" label="The SortableJS library bundled with the plugin">Smoother animation and touch support, but a third-party library file is added to the plugin to maintain.</spec-option>
+    <p class="why">Recommended option accepted: plan pages stay without JS dependencies. In both variants the handle also works from the keyboard (arrow keys move the item).</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-27-plan-page-drag-and-drop-order.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>

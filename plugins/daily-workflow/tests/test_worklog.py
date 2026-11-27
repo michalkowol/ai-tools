@@ -362,6 +362,9 @@ class PlanChecksTest(WorklogTestCase):
         self.assertIn('<plan-page file="plans/2026-11-26.json">', page)
         self.assertIn('<plan-section name="deep_work" class="deep">', page)
         self.assertIn('<plan-section name="meetings"><h2>Meetings</h2>', page)
+        self.assertIn('<plan-section name="priorities" sortable><h2>', page)
+        self.assertIn('<plan-section name="code_review" sortable><h2>', page)
+        self.assertEqual(page.count(" sortable>"), 2)
         self.assertIn('<plan-section name="ai_notes" class="general"><h2>Notes for AI</h2>', page)
         self.assertNotIn('class="reqs"', page)
         self.assertNotIn("<style", page)
@@ -456,6 +459,38 @@ class PlanChecksTest(WorklogTestCase):
         third = json.loads(self.run_cli("plan-apply", "plans/2026-11-26.json", stdin=more).stdout)
         self.assertEqual([(n["id"], n["text"]) for n in third["notes"]],
                          [(2, "move to <next> week"), (3, "move everything unfinished to tomorrow"), (5, "and estimate 2")])
+
+    def test_plan_apply_reorders_sortable_lists_and_remembers_them(self):
+        data = self.plan_data()
+        data["priorities"].append({"title": "Task C"})
+        data["meetings"].append({"start": "16:00", "end": "16:30", "title": "Sync"})
+        path = self.write_plan(data)
+        lines = "\n".join([
+            "/daily-workflow:morning apply plans/2026-11-26.json",
+            json.dumps({"key": "priorities|Task C", "label": "Task C", "done": True}),
+            json.dumps({"order": "priorities", "keys": ["priorities|Task C", "priorities|gone",
+                                                        "priorities|https://www.notion.so/a"]}),
+            json.dumps({"order": "meetings", "keys": ["meetings|16:00 Sync", "meetings|15:00 1:1 Alice"]}),
+            json.dumps({"order": "no_such_list", "keys": ["x"]}),
+        ])
+        out = self.run_cli("plan-apply", "plans/2026-11-26.json", stdin=lines)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        result = json.loads(out.stdout)
+        self.assertEqual(result["reordered"], ["priorities"])
+        self.assertEqual([d["key"] for d in result["done"]], ["priorities|Task C"])
+        data = json.loads(path.read_text())
+        # Listed items first in the given order, the unlisted one keeps its place after them.
+        self.assertEqual([r["title"] for r in data["priorities"]], ["Task C", "Task A", 'Task "B" <x>'])
+        self.assertEqual([m["title"] for m in data["meetings"]], ["1:1 Alice", "Sync"])
+        self.assertEqual(data["manual_order"], ["priorities"])
+        page = path.with_suffix(".html").read_text()
+        self.assertLess(page.index('key="priorities|Task C"'), page.index('key="priorities|https://www.notion.so/a"'))
+
+        # A second list is added to manual_order; the first one stays.
+        more = json.dumps({"order": "code_review", "keys": ["code_review|https://github.com/org/shop/pull/412"]})
+        result = json.loads(self.run_cli("plan-apply", "plans/2026-11-26.json", stdin=more).stdout)
+        self.assertEqual(result["reordered"], ["code_review"])
+        self.assertEqual(json.loads(path.read_text())["manual_order"], ["priorities", "code_review"])
 
     def test_render_refreshes_every_plan_in_the_folder(self):
         path = self.write_plan(self.plan_data())
