@@ -8,7 +8,8 @@ Usage (the most common ones):
   worklog.py context                      # Worklog context for the day plan (JSON)
   worklog.py github                       # pull request data for the day plan (JSON)
   worklog.py render-plan plans/2026-11-23.json
-  worklog.py plan-done plans/2026-11-23.json < pasted-lines   # ticks from the plan page
+  worklog.py plan-apply plans/2026-11-23.json < pasted-lines  # ticks and notes for AI from the plan page
+  worklog.py plan-result plans/2026-11-23.json < result-lines # what became of the notes for AI
   worklog.py inbox start|check|record       # inbox capture state (JSON)
   worklog.py render-inbox inbox/2026-11-23-0930.json
 """
@@ -171,22 +172,41 @@ def cmd_render_plan(args) -> int:
     return 0
 
 
-def cmd_plan_done(args) -> int:
-    """Lines pasted from the plan page ("Copy done") on stdin: mark them done in the JSON and re-render."""
-    path, label = plan_path(args.path)
-    keys = []
+def read_json_lines() -> list[dict]:
+    """The JSON object lines on stdin; the prompt header and anything else is skipped."""
+    out = []
     for line in sys.stdin.read().splitlines():
         line = line.strip()
         if not line.startswith("{"):
             continue
         try:
-            key = json.loads(line).get("key")
-        except (json.JSONDecodeError, AttributeError):
+            value = json.loads(line)
+        except json.JSONDecodeError:
             continue
-        if key:
-            keys.append(str(key))
+        if isinstance(value, dict):
+            out.append(value)
+    return out
+
+
+def cmd_plan_apply(args) -> int:
+    """Lines pasted from the plan page ("Copy prompt") on stdin: mark the ticked items done, store the notes for AI
+    in the JSON and re-render."""
+    path, label = plan_path(args.path)
+    lines = [line for line in read_json_lines() if line.get("key")]
     data = json.loads(path.read_text(encoding="utf-8"))
-    result = plan.mark_done(data, keys)
+    result = plan.apply_lines(data, lines, core.now_iso())
+    core.write_json_atomic(path, data)
+    result["open"] = f"open {host_path(plan.render_file(path, label))}"
+    dump(result)
+    return 0
+
+
+def cmd_plan_result(args) -> int:
+    """What became of the notes for AI, one {"id": 1, "result": "applied: …"} line each on stdin: store the results
+    in the JSON and re-render."""
+    path, label = plan_path(args.path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    result = plan.set_results(data, [line for line in read_json_lines() if "id" in line])
     core.write_json_atomic(path, data)
     result["open"] = f"open {host_path(plan.render_file(path, label))}"
     dump(result)
@@ -304,9 +324,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("path")
     p.set_defaults(func=cmd_render_plan)
 
-    p = sub.add_parser("plan-done", help="mark items ticked on the plan page as done (prompt lines on stdin)")
+    p = sub.add_parser("plan-apply", help="apply the ticks and notes for AI from the plan page (prompt lines on stdin)")
     p.add_argument("path")
-    p.set_defaults(func=cmd_plan_done)
+    p.set_defaults(func=cmd_plan_apply)
+
+    p = sub.add_parser("plan-result", help="store the results of the notes for AI (id and result lines on stdin)")
+    p.add_argument("path")
+    p.set_defaults(func=cmd_plan_result)
 
     p = sub.add_parser("inbox", help="inbox capture state: window, duplicate check, record")
     p.add_argument("action", choices=("start", "check", "record"))

@@ -54,6 +54,7 @@ only `http(s)` URLs become links. Write in English.
   "daily_update": {"yesterday": ["…"], "today": ["…"], "blockers": ["…"]},
   "post_daily": {"plan_changes": ["…"], "team_blockers": ["…"], "needs_help": ["…"], "agreed": ["…"], "decisions": ["…"]},
   "notion_changes": [{"card": "PROJ-1250 retry policy", "change": "New card: Work, Estimate None, Reminder 2026-11-23, Due 2026-11-25, URL Jira", "status": "proposed", "url": ""}],
+  "ai_notes": [{"id": 1, "key": "follow_ups|https://…", "label": "Ping Erin about the contract", "text": "set the reminder to 1 Dec", "result": "applied: Reminder 2026-12-01", "at": "2026-11-23T10:12:00+01:00"}],
   "missing_sources": [{"source": "Gmail", "reason": "connector not signed in"}]
 }
 ```
@@ -72,8 +73,13 @@ only `http(s)` URLs become links. Write in English.
 - `notion_changes[].status`: `proposed`, `applied` or `rejected`.
 - `missing_sources`: one line per source that did not respond.
 - `done` (on any object item) and `done_items` (top level, keys of plain-text items such as agenda points and daily
-  bullets): written only by `worklog plan-done` from the page's "Copy done" prompt. Keep them when rewriting the plan
-  (`update`), so ticked items stay ticked.
-- The page puts a checkbox on every item. Its key is the section plus the item URL (`url`, `source.url` or
-  `event_url`), or its title when there is no URL, so ticks kept in the browser survive a re-render. Keep titles and
+  bullets): written only by `worklog plan-apply` from the page's "Copy prompt" prompt. Keep them when rewriting the
+  plan (`update`), so ticked items stay ticked.
+- `ai_notes` (top level): the notes for AI the user wrote on the page, written only by `worklog plan-apply` (the
+  note, with an empty `result`) and `worklog plan-result` (`applied: …`, `skipped: …` or `failed: …`). `key` is the
+  item key, or `plan` for the note about the whole plan; `text` is the note (an item's own `note` field is plan text,
+  not a note for AI). The page shows them under their items. Keep them when rewriting the plan.
+- The page puts a checkbox and a "+ note" button on every item. The item key is the section plus the item URL
+  (`url`, `source.url` or `event_url`), or its title when there is no URL, so ticks and notes kept in the browser
+  survive a re-render. Keep titles and
   URLs stable between the morning plan and `update`.

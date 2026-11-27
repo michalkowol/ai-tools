@@ -5,10 +5,13 @@ gathered from email, Slack and transcripts, which is data, never markup.
 
 The page is light DOM custom elements with the content inside (readable without JS):
 <plan-page file> holds the header and <main>, every section is a <plan-section name>, every item a
-<plan-item key label [url] [done]>. `assets/plan.js` adds the checkboxes, the section counters and the "Copy done"
-bar. The key is section + URL, or the text when there is no URL, so ticks kept in localStorage survive a re-render.
-`mark_done` writes ticks pasted back from the page into the JSON: `done: true` on object items, the key in
-`done_items` for plain-text items."""
+<plan-item key label [url] [done]>. `assets/plan.js` adds the checkboxes, the section counters, the notes for AI and
+the "Copy prompt" bar. The key is section + URL, or the text when there is no URL, so ticks and notes kept in
+localStorage survive a re-render.
+
+`apply_lines` writes what was pasted back from the page into the JSON: `done: true` on object items (the key in
+`done_items` for plain-text items) and the notes for AI in `ai_notes`; `set_results` stores what became of each
+note. The page shows the stored notes with their results under their items."""
 from __future__ import annotations
 
 import html
@@ -21,7 +24,10 @@ from . import core
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 ASSETS = ("plan.css", "plan.js")
-PAGE_FORMAT = "2"
+PAGE_FORMAT = "3"
+# Key of the note for the whole plan (item keys always contain "|").
+GENERAL_KEY = "plan"
+GENERAL_LABEL = "Whole plan"
 
 KIND_LABEL = {"deep": "deep focus", "heavy": "heavy", "light": "light"}
 
@@ -75,10 +81,32 @@ def item_key(section: str, r: Any) -> str:
 
 
 class Checks:
-    """Builds the <plan-item> markup and knows which keys the JSON already marks as done."""
+    """Builds the <plan-item> markup; knows which keys the JSON marks as done and which notes for AI it stores."""
 
     def __init__(self, plan: dict[str, Any]):
         self.done_items = set(plan.get("done_items") or [])
+        self.notes: dict[str, list[dict[str, Any]]] = {}
+        for n in plan.get("ai_notes") or []:
+            if isinstance(n, dict) and n.get("text"):
+                self.notes.setdefault(str(n.get("key") or GENERAL_KEY), []).append(n)
+        self.shown: set[str] = set()
+
+    def requests(self, key: str, with_label: bool = False) -> str:
+        """The notes for AI stored for one key, each with its result."""
+        rows = self.notes.get(key) or []
+        if not rows:
+            return ""
+        self.shown.add(key)
+        out = []
+        for n in rows:
+            result = str(n.get("result") or "")
+            state = "wait" if not result else "ok" if result.startswith("applied") else "bad"
+            label = f' <span class="req-for">{e(n.get("label"))}:</span>' if with_label and n.get("label") else ""
+            out.append(
+                f'<div class="req" data-text="{e(n.get("text"))}"><span class="req-l">Note for AI</span>{label} '
+                f'{e(n.get("text"))} <span class="res {state}">{e(result or "not carried out yet")}</span></div>'
+            )
+        return f'<div class="reqs" data-key="{e(key)}">' + "".join(out) + "</div>"
 
     def attrs(self, section: str, r: Any) -> str:
         key = item_key(section, r)
@@ -90,7 +118,8 @@ class Checks:
         return out + (" done" if done else "")
 
     def item(self, section: str, r: Any, content: str, sub: str = "") -> str:
-        return f'<plan-item{self.attrs(section, r)}><div class="cbody">{content}</div>{sub}</plan-item>'
+        reqs = self.requests(item_key(section, r))
+        return f'<plan-item{self.attrs(section, r)}><div class="cbody">{content}</div>{reqs}{sub}</plan-item>'
 
     def items(self, section: str, rows: list[dict[str, Any]], render, after=None) -> str:
         rows = [r for r in rows or [] if r]
@@ -214,6 +243,14 @@ def render(plan: dict[str, Any], file_label: str = "") -> str:
         lambda r: f'<span class="k {"ok" if r.get("status") == "applied" else ""}">{e(r.get("status"))}</span>'
         f'<span class="t">{link(r.get("card"), r.get("url"))}</span> {e(r.get("change"))}',
     )))
+    # The note for the whole plan, and stored notes whose item is no longer in the plan.
+    general = checks.requests(GENERAL_KEY)
+    orphans = "".join(checks.requests(k, with_label=True) for k in list(checks.notes) if k not in checks.shown)
+    out.append(
+        '<plan-section name="ai_notes" class="general"><h2>Notes for AI</h2>'
+        '<p class="hint">A note for the whole plan, not tied to one item.</p>'
+        f"{general}{orphans}</plan-section>"
+    )
     missing = plan.get("missing_sources") or []
     if missing:
         out.append(
@@ -286,6 +323,56 @@ def mark_done(plan: dict[str, Any], keys: list[str]) -> dict[str, Any]:
     if done_items:
         plan["done_items"] = done_items
     return {"done": [found[k] for k in wanted if k in found], "unknown": [k for k in wanted if k not in found]}
+
+
+def apply_lines(plan: dict[str, Any], lines: list[dict[str, Any]], at: str = "") -> dict[str, Any]:
+    """Applies the lines pasted from the plan page: `done: true` marks the item done, `note` is stored in `ai_notes`
+    with an empty result. Returns the done items and the notes still to carry out (with the item URL and whether
+    the item is still in the plan), and the unknown keys of the ticks."""
+    result = mark_done(plan, [str(line["key"]) for line in lines if line.get("done") is True])
+    items: dict[str, Any] = {}
+    for key, r in all_items(plan):
+        items.setdefault(key, r)
+    notes = [n for n in plan.get("ai_notes") or [] if isinstance(n, dict)]
+    next_id = max([int(n.get("id") or 0) for n in notes] + [0]) + 1
+    todo = []
+    for line in lines:
+        text = str(line.get("note") or "").strip()
+        if not text:
+            continue
+        key = str(line["key"])
+        item = items.get(key)
+        entry = next((n for n in notes if n.get("key") == key and n.get("text") == text), None)
+        if entry is None:
+            label = GENERAL_LABEL if key == GENERAL_KEY else item_label(item) if item is not None else str(line.get("label") or "")
+            entry = {"id": next_id, "key": key, "label": label, "text": text, "result": "", "at": at}
+            notes.append(entry)
+            next_id += 1
+        elif entry.get("result"):
+            continue  # the same note was already carried out
+        todo.append({
+            "id": entry["id"], "key": key, "label": entry.get("label") or "", "text": text,
+            "url": item_url(item) if isinstance(item, dict) else "",
+            "known": key == GENERAL_KEY or item is not None,
+        })
+    if notes:
+        plan["ai_notes"] = notes
+    result["notes"] = todo
+    return result
+
+
+def set_results(plan: dict[str, Any], results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Stores what became of the notes for AI: {"id": 1, "result": "applied: …"} per note."""
+    by_id = {n.get("id"): n for n in plan.get("ai_notes") or [] if isinstance(n, dict)}
+    updated, unknown = [], []
+    for r in results:
+        note = by_id.get(r.get("id"))
+        if note is None:
+            unknown.append(r.get("id"))
+            continue
+        note["result"] = str(r.get("result") or "")
+        updated.append(note["id"])
+    return {"updated": updated, "unknown": unknown}
 
 
 def copy_assets(names: tuple[str, ...], target: Path) -> None:

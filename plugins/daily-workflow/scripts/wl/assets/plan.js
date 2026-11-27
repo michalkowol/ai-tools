@@ -1,6 +1,6 @@
 /*
  * daily-workflow plan page: components.
- * Plan page format 2
+ * Plan page format 3
  *
  * Copied into ~/.ai/worklog/plans/assets/ by `worklog render-plan` on every render. Do not edit the copy.
  * Light DOM custom elements (no shadow DOM), styled by plan.css. The renderer writes the content:
@@ -8,36 +8,84 @@
  *     <header class="rail">eyebrow, headline, the three acts</header>
  *     <main>
  *       <plan-section name [class="deep"]><h2>title</h2>
- *         <div class="items"><plan-item key label [url] [done]><div class="cbody">…</div>[<div class="sub">…</div>]</plan-item></div>
+ *         <div class="items"><plan-item key label [url] [done]><div class="cbody">…</div>
+ *           [<div class="reqs" data-key><div class="req" data-text>stored note for AI and its result</div></div>]
+ *           [<div class="sub">…</div>]</plan-item></div>
  *       </plan-section>
+ *       <plan-section name="ai_notes" class="general">the note for the whole plan and its stored notes</plan-section>
  *     </main>
  *   </plan-page>
- * The page is readable without JS. With JS every <plan-item> gets a checkbox, every section a "2/3" counter, and
- * the bottom bar copies the "done" prompt. Ticks live in localStorage until that prompt is pasted into the session;
- * then the plan JSON marks the items done (the done attribute) and they stay ticked.
+ * The page is readable without JS. With JS every <plan-item> gets a checkbox and a "+ note" button (a note for AI:
+ * free text about what to do with the item), every section a "2/3" counter, the last section a field for a note
+ * about the whole plan, and the bottom bar copies the "apply" prompt. Ticks and notes live in localStorage until
+ * that prompt is pasted into the session; then the plan JSON marks the items done (the done attribute) and stores
+ * the notes (.req), so they leave localStorage on the next load.
  * Load with <script defer src="..."> so all markup is parsed before upgrade.
  */
 (function () {
   'use strict';
 
+  // Key of the note for the whole plan; item keys always contain "|".
+  const GENERAL = 'plan';
+
   const PlanLogic = {
+    GENERAL,
     storageKey(file) {
       return 'daily-workflow:plan:' + file;
+    },
+    notesKey(file) {
+      return 'daily-workflow:plan-notes:' + file;
     },
     // Ticks that are not in the JSON yet, in page order.
     pending(items, ticks) {
       return items.filter((i) => !i.done && ticks[i.key]);
     },
-    prompt(file, items) {
-      return ['/daily-workflow:morning done ' + file]
-        .concat(items.map((i) => JSON.stringify({ key: i.key, label: i.label })))
-        .join('\n');
+    // The note typed for a key, unless the plan already stores the same text for it.
+    pendingNote(key, sent, notes) {
+      const text = String(notes[key] || '').trim();
+      return text && !(sent || []).includes(text) ? text : '';
+    },
+    // One line per item with a new tick or a new note, in page order; the note for the whole plan comes last.
+    lines(items, ticks, notes, generalSent) {
+      const out = [];
+      items.forEach((i) => {
+        const done = !i.done && !!ticks[i.key];
+        const note = PlanLogic.pendingNote(i.key, i.sent, notes);
+        if (!done && !note) return;
+        const line = { key: i.key, label: i.label };
+        if (done) line.done = true;
+        if (note) line.note = note;
+        out.push(line);
+      });
+      const general = PlanLogic.pendingNote(GENERAL, generalSent, notes);
+      if (general) out.push({ key: GENERAL, label: 'Whole plan', note: general });
+      return out;
+    },
+    prompt(file, lines) {
+      return ['/daily-workflow:morning apply ' + file].concat(lines.map((l) => JSON.stringify(l))).join('\n');
+    },
+    summary(lines) {
+      const done = lines.filter((l) => l.done).length;
+      const notes = lines.filter((l) => l.note).length;
+      return [done ? done + ' done' : '', notes ? notes + (notes === 1 ? ' note' : ' notes') : '']
+        .filter(Boolean).join(' · ');
     },
     // Keys the JSON already marks done do not need to stay in localStorage.
     prune(items, ticks) {
       const out = {};
       const done = new Set(items.filter((i) => i.done).map((i) => i.key));
       Object.keys(ticks).forEach((k) => { if (ticks[k] && !done.has(k)) out[k] = true; });
+      return out;
+    },
+    // Notes the plan already stores do not need to stay in localStorage; notes of unknown keys are kept.
+    pruneNotes(items, notes, generalSent) {
+      const sent = new Map(items.map((i) => [i.key, i.sent || []]));
+      sent.set(GENERAL, generalSent || []);
+      const out = {};
+      Object.keys(notes).forEach((k) => {
+        const text = PlanLogic.pendingNote(k, sent.get(k), notes);
+        if (text) out[k] = text;
+      });
       return out;
     },
   };
@@ -47,8 +95,8 @@
   function load(key) {
     try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (err) { return {}; }
   }
-  function save(key, ticks) {
-    try { localStorage.setItem(key, JSON.stringify(ticks)); } catch (err) { /* storage unavailable: ticks last until reload */ }
+  function save(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (err) { /* storage unavailable: lasts until reload */ }
   }
   function copy(text) {
     if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
@@ -66,6 +114,15 @@
     if (text) n.textContent = text;
     return n;
   };
+  // Texts of the notes the plan already stores in one .reqs box.
+  const sentTexts = (box) => (box ? [...box.querySelectorAll(':scope > .req')].map((r) => r.dataset.text || '') : []);
+  const noteInput = (placeholder) => {
+    const input = el('textarea', 'nin');
+    input.rows = 2;
+    input.placeholder = placeholder;
+    input.setAttribute('aria-label', 'Note for AI');
+    return input;
+  };
 
   class PlanItem extends HTMLElement {
     connectedCallback() {
@@ -74,9 +131,23 @@
       this.box.type = 'checkbox';
       this.box.setAttribute('aria-label', 'Done');
       this.prepend(this.box);
+
+      const reqs = this.querySelector(':scope > .reqs');
+      this.sent = sentTexts(reqs);
+      this.nbtn = el('button', 'nbtn', '+ note');
+      this.nbtn.type = 'button';
+      this.nbtn.title = 'Note for AI: what to do with this item';
+      this.mine = el('div', 'mine');
+      const body = this.querySelector(':scope > .cbody');
+      (body || this.box).after(this.nbtn);
+      (reqs || this.nbtn).after(this.mine);
     }
     get data() {
-      return { key: this.getAttribute('key') || '', label: this.getAttribute('label') || '', done: this.hasAttribute('done') };
+      return { key: this.getAttribute('key') || '', label: this.getAttribute('label') || '',
+        done: this.hasAttribute('done'), sent: this.sent };
+    }
+    get noteInput() {
+      return this.mine.querySelector('.nin');
     }
     show(on) {
       const done = this.hasAttribute('done');
@@ -85,19 +156,37 @@
       this.box.disabled = done;
       this.box.title = done ? 'Marked done in the plan' : '';
     }
+    // The note typed on the page and not sent yet: click to edit.
+    showNote(text) {
+      this.classList.toggle('noted', !!text);
+      this.nbtn.textContent = text ? 'edit note' : '+ note';
+      if (!text) { this.mine.replaceChildren(); return; }
+      const view = el('div', 'mytext');
+      view.title = 'Click to edit';
+      view.append(el('span', 'req-l', 'Note for AI'), ' ' + text + ' ', el('span', 'res new', 'not sent yet'));
+      this.mine.replaceChildren(view);
+    }
+    editNote(text) {
+      this.classList.add('noted');
+      const input = noteInput('e.g. “set the reminder to 1 Dec” or “move to Waiting for”');
+      input.value = text;
+      this.mine.replaceChildren(input, el('div', 'nhint', 'Enter saves · Shift+Enter new line · Esc saves and closes · empty removes the note'));
+      input.focus();
+    }
   }
 
   class PlanSection extends HTMLElement {
     count() {
+      const items = [...this.querySelectorAll('plan-item')];
+      if (!items.length) return;
       if (!this.counter) {
         this.counter = el('span', 'cnt');
         const h2 = this.querySelector('h2');
         if (h2) h2.append(this.counter);
       }
-      const items = [...this.querySelectorAll('plan-item')];
       const ticked = items.filter((i) => i.classList.contains('ticked')).length;
       this.counter.textContent = ticked + '/' + items.length;
-      this.counter.classList.toggle('all', items.length > 0 && ticked === items.length);
+      this.counter.classList.toggle('all', ticked === items.length);
     }
   }
 
@@ -106,16 +195,33 @@
       if (this.ready) return;
       this.ready = true;
       const file = this.getAttribute('file') || location.pathname;
-      this.storage = PlanLogic.storageKey(file);
       this.file = file;
+      this.storage = PlanLogic.storageKey(file);
+      this.notesStorage = PlanLogic.notesKey(file);
       this.nodes = [...this.querySelectorAll('plan-item')];
       this.sections = [...this.querySelectorAll('plan-section')];
+      this.editing = null;
+
+      const general = this.querySelector('plan-section[name="ai_notes"]');
+      this.generalSent = sentTexts(general && general.querySelector(':scope > .reqs[data-key="' + GENERAL + '"]'));
       this.ticks = PlanLogic.prune(this.items(), load(this.storage));
+      this.notes = PlanLogic.pruneNotes(this.items(), load(this.notesStorage), this.generalSent);
       save(this.storage, this.ticks);
+      save(this.notesStorage, this.notes);
+
+      if (general) {
+        this.ginput = noteInput('e.g. “move everything unfinished to tomorrow” or “add a card: call the accountant”');
+        this.ginput.value = this.notes[GENERAL] || '';
+        (general.querySelector(':scope > .hint') || general.querySelector('h2')).after(this.ginput);
+        this.ginput.addEventListener('input', () => {
+          this.setNote(GENERAL, this.ginput.value);
+          this.updateBar();
+        });
+      }
 
       this.bar = el('div', 'bar');
       this.counter = el('span');
-      const button = el('button', 'btn accent', 'Copy done');
+      const button = el('button', 'btn accent', 'Copy prompt');
       button.type = 'button';
       this.ok = el('span', 'ok');
       this.bar.append(this.counter, button, this.ok);
@@ -129,8 +235,21 @@
         save(this.storage, this.ticks);
         this.update();
       });
+      this.addEventListener('click', (ev) => {
+        const hit = ev.target.closest('.nbtn, .mytext');
+        const item = hit && hit.closest('plan-item');
+        if (item) this.openNote(item);
+      });
+      this.addEventListener('keydown', (ev) => {
+        if (!this.editing || ev.target !== this.editing.noteInput) return;
+        if ((ev.key === 'Enter' && !ev.shiftKey) || ev.key === 'Escape') { ev.preventDefault(); this.closeNote(); }
+      });
+      this.addEventListener('focusout', (ev) => {
+        if (this.editing && ev.target === this.editing.noteInput) this.closeNote();
+      });
       button.addEventListener('click', () => {
-        copy(PlanLogic.prompt(this.file, PlanLogic.pending(this.items(), this.ticks))).then(() => {
+        this.closeNote();
+        copy(PlanLogic.prompt(this.file, this.lines())).then(() => {
           this.ok.textContent = 'Copied, paste it into the session';
         });
       });
@@ -139,12 +258,39 @@
     items() {
       return this.nodes.map((n) => n.data);
     }
+    lines() {
+      return PlanLogic.lines(this.items(), this.ticks, this.notes, this.generalSent);
+    }
+    setNote(key, text) {
+      if (String(text || '').trim()) this.notes[key] = String(text).trim(); else delete this.notes[key];
+      save(this.notesStorage, this.notes);
+    }
+    openNote(item) {
+      if (this.editing === item) return;
+      this.closeNote();
+      this.editing = item;
+      item.editNote(this.notes[item.data.key] || '');
+    }
+    closeNote() {
+      const item = this.editing;
+      if (!item) return;
+      this.editing = null;
+      const input = item.noteInput;
+      this.setNote(item.data.key, input ? input.value : '');
+      this.update();
+    }
     update() {
-      this.nodes.forEach((n) => n.show(!!this.ticks[n.data.key]));
+      this.nodes.forEach((n) => {
+        n.show(!!this.ticks[n.data.key]);
+        if (n !== this.editing) n.showNote(PlanLogic.pendingNote(n.data.key, n.sent, this.notes));
+      });
       this.sections.forEach((s) => s.count());
-      const n = PlanLogic.pending(this.items(), this.ticks).length;
-      this.counter.textContent = n + ' done';
-      this.bar.classList.toggle('on', n > 0);
+      this.updateBar();
+    }
+    updateBar() {
+      const lines = this.lines();
+      this.counter.textContent = PlanLogic.summary(lines);
+      this.bar.classList.toggle('on', lines.length > 0);
       this.ok.textContent = '';
     }
   }

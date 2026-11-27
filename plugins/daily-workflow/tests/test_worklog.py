@@ -362,19 +362,22 @@ class PlanChecksTest(WorklogTestCase):
         self.assertIn('<plan-page file="plans/2026-11-26.json">', page)
         self.assertIn('<plan-section name="deep_work" class="deep">', page)
         self.assertIn('<plan-section name="meetings"><h2>Meetings</h2>', page)
+        self.assertIn('<plan-section name="ai_notes" class="general"><h2>Notes for AI</h2>', page)
+        self.assertNotIn('class="reqs"', page)
         self.assertNotIn("<style", page)
         for name in plan.ASSETS:
             self.assertEqual((core.plans_dir() / "assets" / name).read_bytes(), (plan.ASSETS_DIR / name).read_bytes())
 
-    def test_plan_done_marks_items_and_rerenders(self):
+    def test_plan_apply_marks_items_and_rerenders(self):
         path = self.write_plan(self.plan_data())
         lines = "\n".join([
-            "/daily-workflow:morning done plans/2026-11-26.json",
-            json.dumps({"key": "priorities|https://www.notion.so/a", "label": "Task A"}),
-            json.dumps({"key": "agenda|15:00 1:1 Alice|Promotion plan", "label": "Promotion plan"}),
-            json.dumps({"key": "resolved|gone", "label": "Gone"}),
+            "/daily-workflow:morning apply plans/2026-11-26.json",
+            json.dumps({"key": "priorities|https://www.notion.so/a", "label": "Task A", "done": True}),
+            json.dumps({"key": "agenda|15:00 1:1 Alice|Promotion plan", "label": "Promotion plan", "done": True}),
+            json.dumps({"key": "resolved|gone", "label": "Gone", "done": True}),
+            json.dumps({"key": "priorities|https://jira.test/PROJ-1", "label": "Not ticked"}),
         ])
-        out = self.run_cli("plan-done", "plans/2026-11-26.json", stdin=lines)
+        out = self.run_cli("plan-apply", "plans/2026-11-26.json", stdin=lines)
         self.assertEqual(out.returncode, 0, out.stderr)
         result = json.loads(out.stdout)
         self.assertEqual(result["done"][0], {"key": "priorities|https://www.notion.so/a", "label": "Task A",
@@ -386,9 +389,73 @@ class PlanChecksTest(WorklogTestCase):
         self.assertTrue(data["priorities"][0]["done"])
         self.assertNotIn("done", data["priorities"][1])
         self.assertEqual(data["done_items"], ["agenda|15:00 1:1 Alice|Promotion plan"])
+        self.assertEqual(result["notes"], [])
+        self.assertNotIn("ai_notes", data)
         page = path.with_suffix(".html").read_text()
         self.assertIn('key="priorities|https://www.notion.so/a" label="Task A" url="https://www.notion.so/a" done>', page)
         self.assertIn('key="agenda|15:00 1:1 Alice|Promotion plan" label="Promotion plan" done>', page)
+
+    def test_plan_apply_stores_notes_and_plan_result_stores_what_became_of_them(self):
+        path = self.write_plan(self.plan_data())
+        lines = "\n".join([
+            "/daily-workflow:morning apply plans/2026-11-26.json",
+            json.dumps({"key": "priorities|https://www.notion.so/a", "label": "ignored <label>", "done": True,
+                        "note": " set the reminder to 1 Dec "}),
+            json.dumps({"key": "agenda|15:00 1:1 Alice|Promotion plan", "label": "Promotion plan", "note": "move to <next> week"}),
+            json.dumps({"key": "plan", "label": "Whole plan", "note": "move everything unfinished to tomorrow"}),
+            json.dumps({"key": "follow_ups|gone", "label": "Old follow-up", "note": "trash it"}),
+        ])
+        out = self.run_cli("plan-apply", "plans/2026-11-26.json", stdin=lines)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        result = json.loads(out.stdout)
+        self.assertEqual([d["key"] for d in result["done"]], ["priorities|https://www.notion.so/a"])
+        self.assertEqual(result["notes"], [
+            {"id": 1, "key": "priorities|https://www.notion.so/a", "label": "Task A",
+             "text": "set the reminder to 1 Dec", "url": "https://www.notion.so/a", "known": True},
+            {"id": 2, "key": "agenda|15:00 1:1 Alice|Promotion plan", "label": "Promotion plan",
+             "text": "move to <next> week", "url": "", "known": True},
+            {"id": 3, "key": "plan", "label": "Whole plan", "text": "move everything unfinished to tomorrow",
+             "url": "", "known": True},
+            {"id": 4, "key": "follow_ups|gone", "label": "Old follow-up", "text": "trash it", "url": "", "known": False},
+        ])
+        data = json.loads(path.read_text())
+        self.assertEqual([(n["id"], n["result"]) for n in data["ai_notes"]], [(1, ""), (2, ""), (3, ""), (4, "")])
+        self.assertTrue(data["ai_notes"][0]["at"])
+        self.assertNotIn("note", data["priorities"][0])
+        page = path.with_suffix(".html").read_text()
+        self.assertIn('url="https://www.notion.so/a" done><div class="cbody">', page)
+        self.assertIn('<div class="reqs" data-key="priorities|https://www.notion.so/a">'
+                      '<div class="req" data-text="set the reminder to 1 Dec">', page)
+        self.assertIn('data-text="move to &lt;next&gt; week"', page)
+        self.assertIn('<div class="reqs" data-key="plan">', page)
+        self.assertIn('<span class="req-for">Old follow-up:</span> trash it', page)
+        self.assertEqual(page.count("not carried out yet"), 4)
+
+        # The same prompt pasted again adds nothing; the notes are still to do.
+        again = json.loads(self.run_cli("plan-apply", "plans/2026-11-26.json", stdin=lines).stdout)
+        self.assertEqual([n["id"] for n in again["notes"]], [1, 2, 3, 4])
+        self.assertEqual(len(json.loads(path.read_text())["ai_notes"]), 4)
+
+        results = "\n".join([
+            json.dumps({"id": 1, "result": "applied: Reminder 2026-12-01"}),
+            json.dumps({"id": 4, "result": "skipped: the card is gone"}),
+            json.dumps({"id": 9, "result": "applied: nothing"}),
+        ])
+        out = self.run_cli("plan-result", "plans/2026-11-26.json", stdin=results)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        result = json.loads(out.stdout)
+        self.assertEqual((result["updated"], result["unknown"]), ([1, 4], [9]))
+        self.assertTrue(result["open"].endswith("2026-11-26.html"))
+        page = path.with_suffix(".html").read_text()
+        self.assertIn('<span class="res ok">applied: Reminder 2026-12-01</span>', page)
+        self.assertIn('<span class="res bad">skipped: the card is gone</span>', page)
+        self.assertEqual(page.count('<span class="res wait">not carried out yet</span>'), 2)
+
+        # A note that was carried out is not handed out again; a new text for the same item is a new note.
+        more = "\n".join([lines, json.dumps({"key": "priorities|https://www.notion.so/a", "note": "and estimate 2"})])
+        third = json.loads(self.run_cli("plan-apply", "plans/2026-11-26.json", stdin=more).stdout)
+        self.assertEqual([(n["id"], n["text"]) for n in third["notes"]],
+                         [(2, "move to <next> week"), (3, "move everything unfinished to tomorrow"), (5, "and estimate 2")])
 
     def test_render_refreshes_every_plan_in_the_folder(self):
         path = self.write_plan(self.plan_data())
